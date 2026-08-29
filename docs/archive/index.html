@@ -36,7 +36,7 @@
 </div></header>
 
 <main><div class="wrap">
-  <section class="hero"><h1>Archive</h1><p>1 post, newest first.</p></section>
+  <section class="hero"><h1>Archive</h1><p>2 posts, newest first.</p></section>
   
   <h2 style="font-family:var(--mono);font-size:.8rem;letter-spacing:.1em;color:var(--ink-faint);margin:2rem 0 0">2026</h2>
   <ul class="post-list"><li>
@@ -44,6 +44,12 @@
   <p class="verdict"><strong>A bare call is 13ns. A no-op decorator makes it 52ns — and almost all of that is argument repacking, not decoration. Fixing the wrapper signature gets it back to 28ns.</strong></p>
   <p>Thirty-two ways to invoke code in CPython 3.13, measured on the same machine in the same run. The expensive part of a decorator is not the decorating.</p>
   <div class="meta"><time datetime="2026-08-29">Aug 29, 2026</time> <span class="sep">/</span> 8 min <span class="sep">/</span> <a href="/topics/python/">Python</a>, <a href="/topics/performance/">performance</a>, <a href="/topics/benchmarks/">benchmarks</a></div>
+</li>
+<li>
+  <h2><a href="/p/select-star-sqlite/">Is SELECT * actually slower?</a></h2>
+  <p class="verdict"><strong>Yes — but not because the database reads more data. Roughly 90% of the cost is your client turning columns into objects, and the only case where the projection changes what the engine touches is when it defeats a covering index. That case cost 6.8x here.</strong></p>
+  <p>Naming your columns instead of selecting all of them is one of the most repeated rules in code review. Measured on SQLite, the rule is right, but almost every reason given for it is wrong.</p>
+  <div class="meta"><time datetime="2026-08-29">Aug 29, 2026</time> <span class="sep">/</span> 9 min <span class="sep">/</span> <a href="/topics/sqlite/">SQLite</a>, <a href="/topics/sql/">SQL</a>, <a href="/topics/performance/">performance</a>, <a href="/topics/benchmarks/">benchmarks</a></div>
 </li></ul>
 </div></main>
 

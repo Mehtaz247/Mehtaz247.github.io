@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>performance — Overhead</title>
-<meta name="description" content="1 post on performance.">
+<meta name="description" content="2 posts on performance.">
 <link rel="canonical" href="https://mehtaz247.github.io/topics/performance/">
 <meta property="og:site_name" content="Overhead">
 <meta property="og:title" content="performance">
-<meta property="og:description" content="1 post on performance.">
+<meta property="og:description" content="2 posts on performance.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://mehtaz247.github.io/topics/performance/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="performance">
-<meta name="twitter:description" content="1 post on performance.">
+<meta name="twitter:description" content="2 posts on performance.">
 
 
 
@@ -36,12 +36,18 @@
 </div></header>
 
 <main><div class="wrap">
-  <section class="hero"><h1>performance</h1><p>1 post.</p></section>
+  <section class="hero"><h1>performance</h1><p>2 posts.</p></section>
   <ul class="post-list"><li>
   <h2><a href="/p/python-call-overhead/">What a Python function call actually costs</a></h2>
   <p class="verdict"><strong>A bare call is 13ns. A no-op decorator makes it 52ns — and almost all of that is argument repacking, not decoration. Fixing the wrapper signature gets it back to 28ns.</strong></p>
   <p>Thirty-two ways to invoke code in CPython 3.13, measured on the same machine in the same run. The expensive part of a decorator is not the decorating.</p>
   <div class="meta"><time datetime="2026-08-29">Aug 29, 2026</time> <span class="sep">/</span> 8 min <span class="sep">/</span> <a href="/topics/python/">Python</a>, <a href="/topics/performance/">performance</a>, <a href="/topics/benchmarks/">benchmarks</a></div>
+</li>
+<li>
+  <h2><a href="/p/select-star-sqlite/">Is SELECT * actually slower?</a></h2>
+  <p class="verdict"><strong>Yes — but not because the database reads more data. Roughly 90% of the cost is your client turning columns into objects, and the only case where the projection changes what the engine touches is when it defeats a covering index. That case cost 6.8x here.</strong></p>
+  <p>Naming your columns instead of selecting all of them is one of the most repeated rules in code review. Measured on SQLite, the rule is right, but almost every reason given for it is wrong.</p>
+  <div class="meta"><time datetime="2026-08-29">Aug 29, 2026</time> <span class="sep">/</span> 9 min <span class="sep">/</span> <a href="/topics/sqlite/">SQLite</a>, <a href="/topics/sql/">SQL</a>, <a href="/topics/performance/">performance</a>, <a href="/topics/benchmarks/">benchmarks</a></div>
 </li></ul>
 </div></main>
 

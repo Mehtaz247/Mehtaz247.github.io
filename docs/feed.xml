@@ -193,4 +193,228 @@ does not leak into the measurement, and that two runs of the same statement
 agree. Those tests pass on the machine that produced this table.&lt;/p&gt;
 &lt;p&gt;[selftest]: https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/selftest.py&lt;/p&gt;</content>
   </entry>
+  <entry>
+    <title>Is SELECT * actually slower?</title>
+    <link href="https://mehtaz247.github.io/p/select-star-sqlite/"/>
+    <id>https://mehtaz247.github.io/p/select-star-sqlite/</id>
+    <updated>2026-08-29T12:00:00.000Z</updated>
+    <published>2026-08-29T12:00:00.000Z</published>
+    <summary>Naming your columns instead of selecting all of them is one of the most repeated rules in code review. Measured on SQLite, the rule is right, but almost every reason given for it is wrong.</summary>
+    <category term="SQLite"/>
+    <category term="SQL"/>
+    <category term="performance"/>
+    <category term="benchmarks"/>
+    <content type="html">&lt;p&gt;&amp;quot;Don&amp;#39;t use &lt;code&gt;SELECT *&lt;/code&gt;&amp;quot; is one of the few pieces of performance advice that
+survives every code review, at every company, in every language. The rule is
+sound. The reason usually given for it — &lt;em&gt;the database has to read data you
+don&amp;#39;t need&lt;/em&gt; — is, for the most common shape of table, simply false.&lt;/p&gt;
+&lt;p&gt;So this post measures where the cost of &lt;code&gt;SELECT *&lt;/code&gt; actually goes. The answer
+turns out to be somewhere most people are not looking, and it changes which
+queries are worth rewriting.&lt;/p&gt;
+&lt;h2 id=&quot;the-setup&quot;&gt;The setup&lt;a class=&quot;anchor&quot; href=&quot;#the-setup&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Three SQLite tables, all file-backed, all queried warm:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Table&lt;/th&gt;&lt;th&gt;Shape&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Size&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;narrow&lt;/code&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;id&lt;/code&gt; + 10 &lt;code&gt;INTEGER&lt;/code&gt; columns, 50,000 rows&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.0 MB&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;wide&lt;/code&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;id&lt;/code&gt;, &lt;code&gt;a&lt;/code&gt;, five 200-byte &lt;code&gt;TEXT&lt;/code&gt; columns, &lt;code&gt;z&lt;/code&gt;, 50,000 rows&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;68 MB&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;overflow&lt;/code&gt;&lt;/td&gt;&lt;td&gt;&lt;code&gt;id&lt;/code&gt; + 5 &lt;code&gt;INTEGER&lt;/code&gt; + one 4 KB &lt;code&gt;TEXT&lt;/code&gt;, 20,000 rows&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;82 MB&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;Every query is fully consumed with &lt;code&gt;fetchall()&lt;/code&gt;, because a query whose rows are
+never read has not really been run.&lt;/p&gt;
+&lt;h2 id=&quot;select-is-slower-and-the-effect-is-large&quot;&gt;&lt;code&gt;SELECT *&lt;/code&gt; is slower, and the effect is large&lt;a class=&quot;anchor&quot; href=&quot;#select-is-slower-and-the-effect-is-large&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;On the narrow table — ten small integer columns, the shape of most tables in
+most applications — widening the projection scales the query almost linearly:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Columns selected&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Time&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;vs. 1 column&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;1&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;10.87 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.00x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;2&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;16.09 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.48x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;3&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;20.18 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.86x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;5&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;29.25 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.69x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;8&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;44.18 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;4.06x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;11 (&lt;code&gt;SELECT *&lt;/code&gt;)&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;56.79 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;5.22x&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;Five times slower. That looks like a decisive win for the rule, and it is — but
+the interesting question is &lt;em&gt;what&lt;/em&gt; is five times slower, because the obvious
+answer is wrong.&lt;/p&gt;
+&lt;h2 id=&quot;where-the-cost-is-not&quot;&gt;Where the cost is not&lt;a class=&quot;anchor&quot; href=&quot;#where-the-cost-is-not&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Here is the control that settles it. Compare selecting N &lt;em&gt;distinct&lt;/em&gt; columns
+against selecting the &lt;em&gt;same&lt;/em&gt; column N times. Both return N columns per row.
+The second reads only one column out of storage.&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Columns&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;N distinct columns&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Same column, N times&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;1&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;10.87 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;11.58 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;2&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;16.09 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;15.99 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;3&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;20.18 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;20.47 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;5&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;29.25 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;29.50 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;8&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;44.18 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;42.63 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;11&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;56.79 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;56.71 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;They are the same curve. At 11 columns the two differ by 0.1%. Reading ten
+different columns out of the stored row costs no more than reading one column
+ten times, which means the per-column cost is not being paid at the storage
+layer at all.&lt;/p&gt;
+&lt;p&gt;The second control makes the same point from the other direction. Run the
+identical full scan, but discard the results inside SQLite so nothing crosses
+back into Python:&lt;/p&gt;
+&lt;figure class=&quot;code&quot;&gt;&lt;span class=&quot;code-lang&quot;&gt;sql&lt;/span&gt;&lt;pre&gt;&lt;code class=&quot;language-sql&quot;&gt;SELECT count(*) FROM (SELECT c0, c1 FROM t);   -- 0.304 ms
+SELECT count(*) FROM (SELECT *      FROM t);   -- 0.304 ms&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;Identical to each other, and &lt;strong&gt;187 times faster&lt;/strong&gt; than the same scan with the
+rows returned. SQLite&amp;#39;s planner drops columns that nothing consumes, so the
+width of the projection stops mattering entirely.&lt;/p&gt;
+&lt;h2 id=&quot;where-the-cost-is&quot;&gt;Where the cost is&lt;a class=&quot;anchor&quot; href=&quot;#where-the-cost-is&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Splitting the two halves apart directly: &lt;code&gt;sum()&lt;/code&gt; forces SQLite to decode every
+named column but returns a single row, so the client materialises nothing. The
+same columns returned as a result set pay both costs.&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;2 columns&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;10 columns&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Marginal cost per column, per row&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;Decoded in-engine (&lt;code&gt;sum()&lt;/code&gt;)&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.10 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;6.34 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;10.6 ns&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;Returned to Python&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;16.42 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;52.88 ms&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;91.1 ns&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;&lt;strong&gt;An extra column costs 10.6 ns per row inside SQLite and 91.1 ns per row by the
+time it reaches your program — a factor of 8.6.&lt;/strong&gt; And the 10.6 ns is an
+overestimate, because it includes eight extra additions that the other row does
+not perform.&lt;/p&gt;
+&lt;p&gt;Nearly all of what people attribute to &amp;quot;the database reading more data&amp;quot; is
+CPython allocating an object per value and stuffing it into a tuple.&lt;/p&gt;
+&lt;p&gt;The reason is structural. SQLite is a &lt;strong&gt;row store&lt;/strong&gt;: the row lives contiguously
+inside a b-tree page, and scanning the table means reading those pages whether
+you want one column from each row or all of them. Naming two columns does not
+let SQLite read less of the file. It only lets it skip the decode step and,
+much more importantly, skip handing the values to you.&lt;/p&gt;
+&lt;p&gt;This is where the folklore comes from, and why it is misapplied. &amp;quot;Select fewer
+columns and the database reads less data&amp;quot; is &lt;em&gt;true&lt;/em&gt; of columnar stores —
+Parquet, ClickHouse, BigQuery, Redshift — where each column is a separate run of
+bytes and an unread column is genuinely never touched. It is a columnar mental
+model applied to a row store.&lt;/p&gt;
+&lt;p&gt;Two small confirmations that the row is being walked serially, both real but
+tiny: &lt;code&gt;SELECT id&lt;/code&gt; (the rowid, which is the b-tree key and is not stored in the
+record at all) beats &lt;code&gt;SELECT c0&lt;/code&gt; by 12 ns per row, and the last column of the
+row costs 10.4 ns per row more than the first, which is the price of stepping
+through the record header to reach it.&lt;/p&gt;
+&lt;h2 id=&quot;payload-size-matters-and-it-matters-client-side-too&quot;&gt;Payload size matters, and it matters client-side too&lt;a class=&quot;anchor&quot; href=&quot;#payload-size-matters-and-it-matters-client-side-too&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;On the &lt;code&gt;wide&lt;/code&gt; table, the extra columns are 200-byte strings rather than small
+integers:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Query&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Time&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;SELECT a&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;24.03 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;SELECT z&lt;/code&gt; (the column after the text)&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;24.72 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;SELECT a, z&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;29.45 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;SELECT *&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;74.27 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;SELECT *&lt;/code&gt; is 2.5x &lt;code&gt;SELECT a, z&lt;/code&gt;, and the six extra columns cost about 150 ns
+per row each against 92 ns for integers. The rows still fit on a page, so no
+extra I/O is involved — a bigger string is simply a bigger object to allocate
+and copy. The client-side cost scales with the bytes you ask for.&lt;/p&gt;
+&lt;p&gt;Note also that reaching &lt;code&gt;z&lt;/code&gt;, which sits &lt;em&gt;after&lt;/em&gt; a kilobyte of text, costs only
+14 ns per row more than reaching &lt;code&gt;a&lt;/code&gt;. Skipping over a column is nearly free;
+returning it is not.&lt;/p&gt;
+&lt;h2 id=&quot;the-one-case-that-is-genuinely-about-i-o&quot;&gt;The one case that is genuinely about I/O&lt;a class=&quot;anchor&quot; href=&quot;#the-one-case-that-is-genuinely-about-i-o&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;When a value is too big for its page, SQLite spills it onto &lt;strong&gt;overflow pages&lt;/strong&gt;,
+which are chained off the row and read only if that column is required. This is
+the one place where the projection changes how much of the file is touched:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Query (20,000 rows, 4 KB of text each)&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Time&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;SELECT c0, c1&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;21.48 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;SELECT *&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;42.49 ms&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;Two times slower, and this half really is data the engine did not have to read.
+If your table has a &lt;code&gt;description&lt;/code&gt;, a JSON blob, or a serialised payload column,
+&lt;code&gt;SELECT *&lt;/code&gt; drags all of it off disk on every row.&lt;/p&gt;
+&lt;h2 id=&quot;the-case-that-actually-matters-covering-indexes&quot;&gt;The case that actually matters: covering indexes&lt;a class=&quot;anchor&quot; href=&quot;#the-case-that-actually-matters-covering-indexes&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Everything so far is a constant factor. This one is a change of algorithm.&lt;/p&gt;
+&lt;p&gt;Add an index on &lt;code&gt;(c0, c1)&lt;/code&gt; to the overflow table and run a range query matching
+10,001 rows:&lt;/p&gt;
+&lt;figure class=&quot;code&quot;&gt;&lt;span class=&quot;code-lang&quot;&gt;sql&lt;/span&gt;&lt;pre&gt;&lt;code class=&quot;language-sql&quot;&gt;SELECT c0, c1 FROM t WHERE c0 BETWEEN 1000 AND 11000;   --  3.19 ms
+SELECT *      FROM t WHERE c0 BETWEEN 1000 AND 11000;   -- 21.83 ms&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;&lt;strong&gt;6.8x.&lt;/strong&gt; And the query plans say exactly why:&lt;/p&gt;
+&lt;figure class=&quot;code&quot;&gt;&lt;pre&gt;&lt;code&gt;SEARCH t USING COVERING INDEX idx_c0_c1 (c0&amp;gt;? AND c0&amp;lt;?)
+SEARCH t USING INDEX idx_c0_c1 (c0&amp;gt;? AND c0&amp;lt;?)&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;When the projection is contained in the index, SQLite answers the query from the
+index alone and never opens the table. Ask for one more column and it must
+follow every index entry back to the table b-tree — 10,001 extra random
+descents, each landing on a 4 KB row.&lt;/p&gt;
+&lt;p&gt;The structural version of this is better than the timing, because it does not
+depend on caches or hardware at all. &lt;code&gt;dbstat&lt;/code&gt; reports the exact size of each
+b-tree:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Structure&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Bytes&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;Index &lt;code&gt;idx_c0_c1&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;260 KB&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;Table &lt;code&gt;t&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;82.1 MB&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;The covering query can answer itself from &lt;strong&gt;260 KB&lt;/strong&gt;. Adding one unneeded column
+puts an 82 MB structure back in play — 308 times as much data live in the
+query. That ratio holds on any machine, warm or cold.&lt;/p&gt;
+&lt;p&gt;This is the real content of the rule. &lt;code&gt;SELECT *&lt;/code&gt; does not merely return more; it
+silently revokes the planner&amp;#39;s best option.&lt;/p&gt;
+&lt;h2 id=&quot;and-the-case-where-it-does-not-matter-at-all&quot;&gt;And the case where it does not matter at all&lt;a class=&quot;anchor&quot; href=&quot;#and-the-case-where-it-does-not-matter-at-all&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Most queries in most applications fetch one row by primary key:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Query&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Time&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;SELECT c0, c1 FROM t WHERE id = ?&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;7.83 µs&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;SELECT * FROM t WHERE id = ?&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;9.08 µs&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;The difference is &lt;strong&gt;1.26 microseconds&lt;/strong&gt;. Both are dominated by the fixed cost of
+preparing and stepping a statement through Python&amp;#39;s driver, not by the nine
+extra columns. Rewriting this query is worth nothing.&lt;/p&gt;
+&lt;h2 id=&quot;what-to-do-with-this&quot;&gt;What to do with this&lt;a class=&quot;anchor&quot; href=&quot;#what-to-do-with-this&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Ranked by how much it actually buys you:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Name your columns when an index could cover the query.&lt;/strong&gt; This is the only item on the list that changes the plan rather than the constant factor, and it was worth 6.8x here — unbounded in general, because it scales with table size while the covering scan does not. If you take one thing from this post: check &lt;code&gt;EXPLAIN QUERY PLAN&lt;/code&gt; for &lt;code&gt;COVERING INDEX&lt;/code&gt;, and notice when a stray column removes it.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Never &lt;code&gt;SELECT *&lt;/code&gt; a table with a large &lt;code&gt;TEXT&lt;/code&gt; or &lt;code&gt;BLOB&lt;/code&gt; column you don&amp;#39;t need.&lt;/strong&gt; Overflow pages are real I/O, and it was 2x here on rows of only 4 KB.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Name your columns on large result sets&lt;/strong&gt; — tens of thousands of rows and up. Roughly 92 ns per column per row, so nine unneeded columns over 50,000 rows is about 41 ms. Real, but a constant factor, and invisible below a few thousand rows.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Don&amp;#39;t bother rewriting single-row lookups.&lt;/strong&gt; 1.26 µs. Spend the review comment on something else.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Stop justifying the rule with &amp;quot;the database reads more data.&amp;quot;&lt;/strong&gt; On a row store it reads the same pages either way. Say &amp;quot;it can defeat a covering index,&amp;quot; which is true, and which points at the queries actually worth fixing.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;The corollary worth sitting with: if most of the cost of a wide result set is
+your client building objects, then that cost is charged per row returned,
+whatever the projection. Fetching 50,000 rows to use ten of them is a much
+bigger mistake than fetching ten columns to use two, and no code review rule
+catches it.&lt;/p&gt;
+&lt;aside class=&quot;callout callout-note&quot;&gt;&lt;p class=&quot;callout-label&quot;&gt;NOTE&lt;/p&gt;&lt;p&gt;These numbers are SQLite on one M1 laptop with a warm page cache, driven by
+CPython 3.13.1. Three limits worth naming. &lt;strong&gt;The client-side figure is
+CPython&amp;#39;s&lt;/strong&gt;; a driver in Go or Rust allocates more cheaply and would shift the
+8.6x split, though not the direction. &lt;strong&gt;There is no network here&lt;/strong&gt; — against
+Postgres or MySQL, &lt;code&gt;SELECT *&lt;/code&gt; also pays wire bytes for every unneeded column,
+a cost this experiment cannot see and which likely dominates. &lt;strong&gt;And a warm
+cache flatters every row-store scan equally&lt;/strong&gt;; on cold storage the overflow
+and covering-index results would grow, not shrink. The covering-index byte
+counts are the one result here that is independent of all three.&lt;/p&gt;&lt;/aside&gt;
+&lt;h2 id=&quot;method&quot;&gt;Method&lt;a class=&quot;anchor&quot; href=&quot;#method&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Each query is compiled into a timing loop and run at least nine times, with the
+minimum reported: timing noise on a general-purpose OS is additive, so the
+fastest observed run is the best estimate of true cost. Every figure in this
+post came from a single run of
+&lt;a href=&quot;https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/select-star-sqlite/run.py&quot; rel=&quot;noopener&quot; target=&quot;_blank&quot;&gt;&lt;code&gt;run.py&lt;/code&gt;&lt;/a&gt;,
+and the raw output including medians and spreads is committed in
+&lt;a href=&quot;https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/select-star-sqlite/results.json&quot; rel=&quot;noopener&quot; target=&quot;_blank&quot;&gt;&lt;code&gt;results.json&lt;/code&gt;&lt;/a&gt;.
+Spreads were under 3% for every measurement except &lt;code&gt;wide: SELECT *&lt;/code&gt; (6.7%), and
+nothing above 15% is cited here.&lt;/p&gt;
+&lt;p&gt;The overflow table is 20,000 rows rather than 50,000 on purpose. At 50,000 rows
+it is a 205 MB working set on an 8 GB laptop, and the benchmark came back with a
+23% spread — that measurement was of page-cache eviction, not of column
+decoding, and it was not publishable. At 20,000 rows the working set stays
+resident, the spread falls to 4%, and the ratio it reports (1.98x) agrees with
+the noisy larger run (2.14x).&lt;/p&gt;
+&lt;p&gt;Databases are built once per run and queried warm, so no figure includes the
+cost of first-touch disk reads. Garbage collection is disabled during
+measurement. The benchmark harness has
+&lt;a href=&quot;https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/selftest.py&quot; rel=&quot;noopener&quot; target=&quot;_blank&quot;&gt;its own test suite&lt;/a&gt;,
+which passes on the machine that produced this table.&lt;/p&gt;</content>
+  </entry>
 </feed>

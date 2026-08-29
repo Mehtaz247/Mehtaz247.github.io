@@ -7,5 +7,8 @@
   <url><loc>https://mehtaz247.github.io/topics/benchmarks/</loc><priority>0.4</priority></url>
   <url><loc>https://mehtaz247.github.io/topics/performance/</loc><priority>0.4</priority></url>
   <url><loc>https://mehtaz247.github.io/topics/python/</loc><priority>0.4</priority></url>
+  <url><loc>https://mehtaz247.github.io/topics/sql/</loc><priority>0.4</priority></url>
+  <url><loc>https://mehtaz247.github.io/topics/sqlite/</loc><priority>0.4</priority></url>
   <url><loc>https://mehtaz247.github.io/p/python-call-overhead/</loc><lastmod>2026-08-29</lastmod><priority>0.8</priority></url>
+  <url><loc>https://mehtaz247.github.io/p/select-star-sqlite/</loc><lastmod>2026-08-29</lastmod><priority>0.8</priority></url>
 </urlset>

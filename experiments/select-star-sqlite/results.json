@@ -1,0 +1,423 @@
+{
+  "slug": "select-star-sqlite",
+  "question": "How much does SELECT * cost versus naming the columns you need?",
+  "measured_at": "2026-08-29T13:57:08Z",
+  "environment": {
+    "python": "3.13.1",
+    "implementation": "CPython",
+    "os": "Darwin 25.6.0",
+    "machine": "arm64",
+    "cpu": "Apple M1",
+    "model": "MacBookAir10,1",
+    "cores": "8",
+    "memory_gb": 8,
+    "os_version": "26.6.2"
+  },
+  "noise_floor_ns": 0.5,
+  "facts": {
+    "rows": 50000,
+    "overflow_rows": 20000,
+    "sqlite_version": "3.48.0",
+    "page_size": 4096,
+    "narrow_db_pages": 509,
+    "wide_db_pages": 16698,
+    "overflow_db_pages": 20048,
+    "overflow_db_mb": 82.1,
+    "plan_covered": "SEARCH t USING COVERING INDEX idx_c0_c1 (c0>? AND c0<?)",
+    "plan_uncovered": "SEARCH t USING INDEX idx_c0_c1 (c0>? AND c0<?)",
+    "matching_rows": 10001,
+    "bytes_table_overflow": 82112512,
+    "bytes_index_c0_c1": 266240,
+    "ns_per_extra_column_per_row": 91.8,
+    "ns_per_column_per_row_engine_side": 10.6,
+    "ns_per_column_per_row_client_side": 91.1,
+    "client_to_engine_ratio": 8.6
+  },
+  "results": [
+    {
+      "name": "1 distinct columns",
+      "ns_per_op": 10869713.11111111,
+      "median_ns": 10975282.444444444,
+      "spread_pct": 0.9712246519682302,
+      "iterations": 9,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 1,
+        "kind": "distinct"
+      }
+    },
+    {
+      "name": "1 copies of one column",
+      "ns_per_op": 11581858.4,
+      "median_ns": 11661258.4,
+      "spread_pct": 0.6855549192347232,
+      "iterations": 5,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 1,
+        "kind": "repeated"
+      }
+    },
+    {
+      "name": "2 distinct columns",
+      "ns_per_op": 16090680.333333334,
+      "median_ns": 16236569.333333334,
+      "spread_pct": 0.9066676919668676,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 2,
+        "kind": "distinct"
+      }
+    },
+    {
+      "name": "2 copies of one column",
+      "ns_per_op": 15994264.0,
+      "median_ns": 16198111.0,
+      "spread_pct": 1.2745006584860672,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 2,
+        "kind": "repeated"
+      }
+    },
+    {
+      "name": "3 distinct columns",
+      "ns_per_op": 20184416.666666664,
+      "median_ns": 20653514.0,
+      "spread_pct": 2.3240569251031244,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 3,
+        "kind": "distinct"
+      }
+    },
+    {
+      "name": "3 copies of one column",
+      "ns_per_op": 20466722.333333332,
+      "median_ns": 20638416.666666664,
+      "spread_pct": 0.8388951124513983,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 3,
+        "kind": "repeated"
+      }
+    },
+    {
+      "name": "5 distinct columns",
+      "ns_per_op": 29253875.0,
+      "median_ns": 29586916.666666664,
+      "spread_pct": 1.1384531678851577,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 5,
+        "kind": "distinct"
+      }
+    },
+    {
+      "name": "5 copies of one column",
+      "ns_per_op": 29501569.666666664,
+      "median_ns": 29540680.666666664,
+      "spread_pct": 0.13257260695586265,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 5,
+        "kind": "repeated"
+      }
+    },
+    {
+      "name": "8 distinct columns",
+      "ns_per_op": 44180278.0,
+      "median_ns": 44339472.333333336,
+      "spread_pct": 0.36032895341522253,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 8,
+        "kind": "distinct"
+      }
+    },
+    {
+      "name": "8 copies of one column",
+      "ns_per_op": 42634417.0,
+      "median_ns": 42865361.0,
+      "spread_pct": 0.541684433025084,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 8,
+        "kind": "repeated"
+      }
+    },
+    {
+      "name": "11 distinct columns",
+      "ns_per_op": 56785000.0,
+      "median_ns": 57278500.0,
+      "spread_pct": 0.8690675354406975,
+      "iterations": 1,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 11,
+        "kind": "distinct"
+      }
+    },
+    {
+      "name": "11 copies of one column",
+      "ns_per_op": 56709250.0,
+      "median_ns": 56954251.0,
+      "spread_pct": 0.432030048008041,
+      "iterations": 1,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 11,
+        "kind": "repeated"
+      }
+    },
+    {
+      "name": "2 columns decoded in-engine (sum)",
+      "ns_per_op": 2101163.2083333335,
+      "median_ns": 2133664.9583333335,
+      "spread_pct": 1.546845569687124,
+      "iterations": 24,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 2
+      }
+    },
+    {
+      "name": "2 columns returned to Python",
+      "ns_per_op": 16416499.666666666,
+      "median_ns": 16559194.333333334,
+      "spread_pct": 0.869214933536692,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 2
+      }
+    },
+    {
+      "name": "10 columns decoded in-engine (sum)",
+      "ns_per_op": 6338682.25,
+      "median_ns": 6363083.25,
+      "spread_pct": 0.38495382853431404,
+      "iterations": 8,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 10
+      }
+    },
+    {
+      "name": "10 columns returned to Python",
+      "ns_per_op": 52875916.0,
+      "median_ns": 53008500.0,
+      "spread_pct": 0.25074553791181603,
+      "iterations": 1,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {
+        "n_columns": 10
+      }
+    },
+    {
+      "name": "SELECT id (the rowid)",
+      "ns_per_op": 11009558.2,
+      "median_ns": 11060158.2,
+      "spread_pct": 0.4596006404689336,
+      "iterations": 5,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "SELECT c0 (first stored column)",
+      "ns_per_op": 11621674.799999999,
+      "median_ns": 11660716.6,
+      "spread_pct": 0.3359395325706476,
+      "iterations": 5,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "SELECT c9 (last stored column)",
+      "ns_per_op": 12140187.75,
+      "median_ns": 12193073.0,
+      "spread_pct": 0.4356213519020742,
+      "iterations": 4,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "count(*) over 2 columns",
+      "ns_per_op": 303772.98206278024,
+      "median_ns": 306193.3856502242,
+      "spread_pct": 0.796780401933101,
+      "iterations": 223,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "count(*) over SELECT *",
+      "ns_per_op": 304101.0852017937,
+      "median_ns": 308712.63228699553,
+      "spread_pct": 1.5164520317780938,
+      "iterations": 223,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "wide: SELECT a",
+      "ns_per_op": 24025251.0,
+      "median_ns": 24440875.0,
+      "spread_pct": 1.729946546656266,
+      "iterations": 1,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "wide: SELECT z (after the text)",
+      "ns_per_op": 24722625.333333332,
+      "median_ns": 24822166.666666664,
+      "spread_pct": 0.40263253595127396,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "wide: SELECT a, z",
+      "ns_per_op": 29452027.666666668,
+      "median_ns": 29679680.666666668,
+      "spread_pct": 0.7729620608011788,
+      "iterations": 3,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "wide: SELECT *",
+      "ns_per_op": 74274292.0,
+      "median_ns": 79279584.0,
+      "spread_pct": 6.738929265054455,
+      "iterations": 1,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "overflow: SELECT c0, c1",
+      "ns_per_op": 21476833.0,
+      "median_ns": 21694000.0,
+      "spread_pct": 1.011168639249558,
+      "iterations": 1,
+      "trials": 15,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "overflow: SELECT *",
+      "ns_per_op": 42491875.0,
+      "median_ns": 44247166.0,
+      "spread_pct": 4.13088619883213,
+      "iterations": 1,
+      "trials": 15,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "covered: SELECT c0, c1",
+      "ns_per_op": 3194860.478260869,
+      "median_ns": 3202782.608695652,
+      "spread_pct": 0.24796483253926452,
+      "iterations": 23,
+      "trials": 15,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "uncovered: SELECT *",
+      "ns_per_op": 21833861.0,
+      "median_ns": 22094319.333333332,
+      "spread_pct": 1.1929101011192298,
+      "iterations": 3,
+      "trials": 15,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "point lookup: 2 columns",
+      "ns_per_op": 7826.088358161898,
+      "median_ns": 7927.5340900134,
+      "spread_pct": 1.2962507859459933,
+      "iterations": 12687,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    },
+    {
+      "name": "point lookup: SELECT *",
+      "ns_per_op": 9083.295066935632,
+      "median_ns": 9149.290849073905,
+      "spread_pct": 0.7265621302835954,
+      "iterations": 5453,
+      "trials": 9,
+      "below_noise_floor": false,
+      "note": "",
+      "extra": {}
+    }
+  ]
+}
