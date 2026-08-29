@@ -1,0 +1,76 @@
+{
+  "updated": "2026-08-29",
+  "note": "Candidate posts. `contested_belief` is the thing readers currently believe that the post would test -- an idea without one is usually not worth writing, because confirming the obvious does not earn a reader's time. Ideas are pruned as aggressively as they are added.",
+
+  "ready": [
+    {
+      "slug": "select-star-sqlite",
+      "title": "Is SELECT * actually slower?",
+      "question": "How much does selecting every column cost versus naming the two you need?",
+      "contested_belief": "SELECT * is always wasteful and should never appear in application code.",
+      "why_now": "Repeated as an absolute rule in code review with essentially no data behind it. The honest answer almost certainly depends on row width and whether a covering index exists, which is a more useful post than either dogma.",
+      "design": "SQLite via the stdlib, so there is nothing to install. Vary column count and row width. Include the covering-index case, which is where the real effect should live.",
+      "confidence_it_is_interesting": "high"
+    },
+    {
+      "slug": "python-startup-cost",
+      "title": "What does `import` cost?",
+      "question": "How much of a short Python program's runtime is spent before its first line executes?",
+      "contested_belief": "Import time is negligible and not worth thinking about.",
+      "why_now": "Directly actionable for CLI tools, where startup latency is the entire user experience. `-X importtime` makes this measurable precisely.",
+      "design": "Measure bare interpreter start, then the cost of common imports individually and cumulatively. Compare against Node and against a compiled binary for scale.",
+      "confidence_it_is_interesting": "high"
+    },
+    {
+      "slug": "dict-vs-list-crossover",
+      "title": "At what size does a dict beat a list?",
+      "question": "Linear scan over a list versus a hash lookup: where is the crossover, really?",
+      "contested_belief": "Dicts are faster than lists for lookup, full stop.",
+      "why_now": "The crossover is much larger than most people guess, because a linear scan over a small contiguous list is extremely cache-friendly. A concrete crossover number is genuinely useful and easy to verify.",
+      "design": "Sweep container size from 1 to ~10000, measure hit and miss separately (miss is the worst case for the list and is where the honest answer lives). Chart it.",
+      "confidence_it_is_interesting": "high"
+    }
+  ],
+
+  "considering": [
+    {
+      "slug": "json-parse-cost",
+      "question": "How much of an API call's latency is actually JSON parsing?",
+      "contested_belief": "JSON parsing is a meaningful cost in a web service.",
+      "risk": "The answer is probably 'nowhere near as much as the network', which may be too obvious to be worth a post. Would need a genuinely surprising angle -- perhaps the crossover payload size where it starts to matter."
+    },
+    {
+      "slug": "git-status-scaling",
+      "question": "How does `git status` scale with repository size?",
+      "contested_belief": "Git is slow on large repositories.",
+      "risk": "Hard to isolate from filesystem caching, and the result depends heavily on the OS. Would need careful cold/warm cache separation."
+    },
+    {
+      "slug": "string-concat-loop",
+      "question": "How bad is building a string by repeated concatenation?",
+      "contested_belief": "Concatenating in a loop is quadratic and catastrophic.",
+      "risk": "CPython has an in-place optimisation for the refcount-1 case that makes the naive version much faster than the folklore suggests. That gap IS the post -- but it is well-trodden ground and needs a fresh angle to justify."
+    },
+    {
+      "slug": "sorting-nearly-sorted",
+      "question": "How much does Timsort actually gain on nearly-sorted data?",
+      "contested_belief": "Sorting is O(n log n) regardless of input order.",
+      "risk": "None obvious. Timsort's adaptive behaviour is real, dramatic, and under-appreciated. Promote to ready if the first three land well."
+    }
+  ],
+
+  "rejected": [
+    {
+      "idea": "Benchmarking LLM inference speeds across providers",
+      "reason": "Numbers rot within weeks, cannot be reproduced by a reader without paid API keys, and the result would be marketing rather than measurement. Fails the reproducibility test that the whole blog rests on."
+    },
+    {
+      "idea": "Which JavaScript framework is fastest",
+      "reason": "Saturated, tribal, and the honest answer ('it depends on what you build') makes for a bad measurement post. The audience for this is not the audience this blog is for."
+    },
+    {
+      "idea": "Tutorial posts, e.g. 'how to profile Python code'",
+      "reason": "Off-format. This blog answers questions with data; it does not teach procedures. Plenty of good tutorials exist and none of them need an AI to write another."
+    }
+  ]
+}

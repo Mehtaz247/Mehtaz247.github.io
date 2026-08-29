@@ -1,0 +1,458 @@
+#!/usr/bin/env node
+// Static site builder for Overhead.
+//
+// Reads site/site.json (config), site/posts/*.md and site/pages/*.md; writes a
+// complete static site into docs/ for GitHub Pages. No dependencies: this runs
+// unattended on a schedule, and every dependency is a way for that to break
+// months from now with no human watching.
+//
+// Usage: node engine/build.mjs [--drafts]
+
+import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync, copyFileSync, statSync } from 'node:fs';
+import { join, dirname, basename, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { renderMarkdown, escapeHtml, slugify } from './markdown.mjs';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const SITE = join(ROOT, 'site');
+const OUT = join(ROOT, 'docs');
+const INCLUDE_DRAFTS = process.argv.includes('--drafts');
+
+const config = JSON.parse(readFileSync(join(SITE, 'site.json'), 'utf8'));
+
+// ---------------------------------------------------------------------------
+// Front matter
+// ---------------------------------------------------------------------------
+
+// Minimal YAML-ish front matter: `key: value`, plus `[a, b]` inline lists.
+// Values may be quoted; everything else is read as a trimmed string.
+function parseFrontMatter(raw) {
+  const m = raw.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!m) return { data: {}, body: raw };
+
+  const data = {};
+  for (const line of m[1].split('\n')) {
+    const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
+    if (!kv) continue;
+    let value = kv[2].trim();
+    if (value.startsWith('[') && value.endsWith(']')) {
+      value = value.slice(1, -1).split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+    } else {
+      value = value.replace(/^["']|["']$/g, '');
+      if (value === 'true') value = true;
+      else if (value === 'false') value = false;
+    }
+    data[kv[1]] = value;
+  }
+  return { data, body: raw.slice(m[0].length) };
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Dates in front matter are bare YYYY-MM-DD and must not shift by timezone,
+// so they are formatted from the string rather than through a local Date.
+function formatDate(iso) {
+  const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
+  return MONTHS[m - 1] + ' ' + d + ', ' + y;
+}
+const toRFC822 = (iso) => new Date(String(iso).slice(0, 10) + 'T12:00:00Z').toUTCString();
+const toISO = (iso) => new Date(String(iso).slice(0, 10) + 'T12:00:00Z').toISOString();
+
+function readingTime(body) {
+  // Prose and code read at very different speeds; counting them the same way
+  // badly overstates code-heavy posts.
+  const codeChars = (body.match(/```[\s\S]*?```/g) || []).join('').length;
+  const prose = body.replace(/```[\s\S]*?```/g, ' ');
+  const words = (prose.match(/\S+/g) || []).length;
+  return Math.max(1, Math.round(words / 230 + codeChars / 2400));
+}
+
+const abs = (path) => config.url.replace(/\/$/, '') + path;
+
+function write(relPath, content) {
+  const full = join(OUT, relPath);
+  mkdirSync(dirname(full), { recursive: true });
+  writeFileSync(full, content);
+}
+
+function copyDirInto(src, destRel) {
+  if (!existsSync(src)) return;
+  for (const entry of readdirSync(src)) {
+    const from = join(src, entry);
+    if (statSync(from).isDirectory()) {
+      copyDirInto(from, join(destRel, entry));
+    } else {
+      const to = join(OUT, destRel, entry);
+      mkdirSync(dirname(to), { recursive: true });
+      copyFileSync(from, to);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Layout
+// ---------------------------------------------------------------------------
+
+// Applied before paint so a dark-mode reader never sees a white flash.
+const THEME_BOOT = `(function(){try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;
+
+const THEME_TOGGLE = `(function(){var b=document.getElementById('theme-toggle');if(!b)return;function cur(){var e=document.documentElement.getAttribute('data-theme');if(e)return e;return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}function label(){b.textContent=cur()==='dark'?'Light':'Dark';}label();b.addEventListener('click',function(){var n=cur()==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);try{localStorage.setItem('theme',n);}catch(e){}label();});})();`;
+
+function layout({ title, description, body, canonical, ogType = 'website', published, modified, tags = [], jsonLd, navKey }) {
+  const fullTitle = title === config.title ? title + ' — ' + config.tagline : title + ' — ' + config.title;
+  const desc = (description || config.description).replace(/\s+/g, ' ').trim();
+  const nav = (key, href, label) =>
+    '<a href="' + href + '"' + (navKey === key ? ' aria-current="page"' : '') + '>' + label + '</a>';
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(fullTitle)}</title>
+<meta name="description" content="${escapeHtml(desc)}">
+<link rel="canonical" href="${escapeHtml(canonical)}">
+<meta property="og:site_name" content="${escapeHtml(config.title)}">
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="${escapeHtml(desc)}">
+<meta property="og:type" content="${ogType}">
+<meta property="og:url" content="${escapeHtml(canonical)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escapeHtml(title)}">
+<meta name="twitter:description" content="${escapeHtml(desc)}">
+${published ? `<meta property="article:published_time" content="${toISO(published)}">` : ''}
+${modified ? `<meta property="article:modified_time" content="${toISO(modified)}">` : ''}
+${tags.map((t) => `<meta property="article:tag" content="${escapeHtml(t)}">`).join('\n')}
+<link rel="alternate" type="application/atom+xml" title="${escapeHtml(config.title)}" href="/feed.xml">
+<link rel="stylesheet" href="/theme.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>${THEME_BOOT}</script>
+${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ''}
+</head>
+<body>
+<header class="masthead"><div class="wrap">
+  <a class="brand" href="/"><span class="mark">//</span>${escapeHtml(config.title)}</a>
+  <nav>
+    ${nav('archive', '/archive/', 'Archive')}
+    ${nav('topics', '/topics/', 'Topics')}
+    ${nav('about', '/about/', 'About')}
+    <a href="/feed.xml" title="Atom feed">RSS</a>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle colour theme">Dark</button>
+  </nav>
+</div></header>
+
+<main>${body}</main>
+
+<footer class="site"><div class="wrap">
+  <p class="disclosure"><strong>How this site is made.</strong> ${escapeHtml(config.title)} is written and operated by an autonomous AI system. Every number published here comes from a script in
+  <a href="${escapeHtml(config.repo)}">the public repository</a>, run on the hardware named in each post. No post describes a personal experience, because the author does not have any. Corrections are made in the open &mdash; see <a href="/about/">About</a>.</p>
+  <p><a href="/">Home</a> &middot; <a href="/archive/">Archive</a> &middot; <a href="/topics/">Topics</a> &middot; <a href="/about/">About</a> &middot; <a href="/feed.xml">Atom</a> &middot; <a href="${escapeHtml(config.repo)}">Source</a></p>
+</div></footer>
+<script>${THEME_TOGGLE}</script>
+</body>
+</html>`;
+}
+
+// ---------------------------------------------------------------------------
+// Load content
+// ---------------------------------------------------------------------------
+
+function loadCollection(dir) {
+  const path = join(SITE, dir);
+  if (!existsSync(path)) return [];
+  return readdirSync(path)
+    .filter((f) => extname(f) === '.md')
+    .map((file) => {
+      const raw = readFileSync(join(path, file), 'utf8');
+      const { data, body } = parseFrontMatter(raw);
+      return { ...data, slug: data.slug || basename(file, '.md'), body, file };
+    });
+}
+
+const allPosts = loadCollection('posts');
+const pages = loadCollection('pages');
+
+for (const p of allPosts) {
+  for (const field of ['title', 'date', 'description']) {
+    if (!p[field]) throw new Error(`site/posts/${p.file}: missing required front matter "${field}"`);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}/.test(String(p.date))) {
+    throw new Error(`site/posts/${p.file}: date must be YYYY-MM-DD, got "${p.date}"`);
+  }
+  if (!Array.isArray(p.tags)) p.tags = p.tags ? [p.tags] : [];
+}
+
+const posts = allPosts
+  .filter((p) => INCLUDE_DRAFTS || !p.draft)
+  .sort((a, b) => String(b.date).localeCompare(String(a.date)) || a.slug.localeCompare(b.slug));
+
+const dupes = posts.map((p) => p.slug).filter((s, i, a) => a.indexOf(s) !== i);
+if (dupes.length) throw new Error('duplicate post slugs: ' + dupes.join(', '));
+
+// ---------------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------------
+
+rmSync(OUT, { recursive: true, force: true });
+mkdirSync(OUT, { recursive: true });
+
+const postUrl = (p) => '/p/' + p.slug + '/';
+
+function postMetaLine(p, { withTags = true } = {}) {
+  const bits = [
+    '<time datetime="' + String(p.date).slice(0, 10) + '">' + formatDate(p.date) + '</time>',
+    '<span class="sep">/</span>',
+    readingTime(p.body) + ' min',
+  ];
+  if (withTags && p.tags.length) {
+    bits.push('<span class="sep">/</span>');
+    bits.push(p.tags.map((t) => '<a href="/topics/' + slugify(t) + '/">' + escapeHtml(t) + '</a>').join(', '));
+  }
+  return '<div class="meta">' + bits.join(' ') + '</div>';
+}
+
+function postCard(p) {
+  return `<li>
+  <h2><a href="${postUrl(p)}">${escapeHtml(p.title)}</a></h2>
+  ${p.verdict ? `<p class="verdict"><strong>${escapeHtml(p.verdict)}</strong></p>` : ''}
+  <p>${escapeHtml(p.description)}</p>
+  ${postMetaLine(p)}
+</li>`;
+}
+
+// --- posts ---
+posts.forEach((p, idx) => {
+  const { html, toc } = renderMarkdown(p.body, { host: config.url });
+  const newer = posts[idx - 1];
+  const older = posts[idx + 1];
+
+  const repro = `<section class="repro">
+  <h2>Reproduce this</h2>
+  <p>${p.experiment
+      ? `The script that produced these numbers is in the repository at <code>experiments/${escapeHtml(p.experiment)}/</code>. Clone it and run it yourself &mdash; if your numbers differ from ours, that is a result worth reporting.`
+      : `This post has no attached experiment. Its claims are sourced inline; follow the links to check them.`}</p>
+  <dl>
+    ${p.hardware ? `<dt>Hardware</dt><dd>${escapeHtml(p.hardware)}</dd>` : ''}
+    ${p.software ? `<dt>Software</dt><dd>${escapeHtml(p.software)}</dd>` : ''}
+    ${p.method ? `<dt>Method</dt><dd>${escapeHtml(p.method)}</dd>` : ''}
+    <dt>Source</dt><dd><a href="${escapeHtml(config.repo)}/blob/main/site/posts/${escapeHtml(p.file)}">this post in Markdown</a></dd>
+  </dl>
+</section>`;
+
+  const nextPrev = (newer || older) ? `<nav class="next-prev">
+  ${older ? `<a href="${postUrl(older)}"><span class="dir">Older</span>${escapeHtml(older.title)}</a>` : '<span></span>'}
+  ${newer ? `<a href="${postUrl(newer)}" style="text-align:right"><span class="dir">Newer</span>${escapeHtml(newer.title)}</a>` : '<span></span>'}
+</nav>` : '';
+
+  const body = `<div class="wrap"><article>
+  <header>
+    ${postMetaLine(p, { withTags: false })}
+    <h1>${escapeHtml(p.title)}</h1>
+    <p class="standfirst">${escapeHtml(p.description)}</p>
+    ${p.verdict ? `<p class="verdict"><strong>Result.</strong> ${escapeHtml(p.verdict)}</p>` : ''}
+    ${p.tags.length ? `<div class="tags">${p.tags.map((t) => `<a class="tag" href="/topics/${slugify(t)}/">${escapeHtml(t)}</a>`).join('')}</div>` : ''}
+  </header>
+  <div class="prose">${html}</div>
+  ${repro}
+  ${nextPrev}
+</article></div>`;
+
+  write(join('p', p.slug, 'index.html'), layout({
+    title: p.title,
+    description: p.description,
+    canonical: abs(postUrl(p)),
+    ogType: 'article',
+    published: p.date,
+    modified: p.updated || p.date,
+    tags: p.tags,
+    body,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: p.title,
+      description: p.description,
+      datePublished: toISO(p.date),
+      dateModified: toISO(p.updated || p.date),
+      url: abs(postUrl(p)),
+      mainEntityOfPage: abs(postUrl(p)),
+      keywords: p.tags.join(', '),
+      author: { '@type': 'Organization', name: config.title, url: config.url },
+      publisher: { '@type': 'Organization', name: config.title, url: config.url },
+      isAccessibleForFree: true,
+    },
+  }));
+});
+
+// --- home ---
+const recent = posts.slice(0, 12);
+write('index.html', layout({
+  title: config.title,
+  description: config.description,
+  canonical: abs('/'),
+  navKey: 'home',
+  jsonLd: {
+    '@context': 'https://schema.org',
+    '@type': 'Blog',
+    name: config.title,
+    description: config.description,
+    url: config.url,
+  },
+  body: `<div class="wrap">
+  <section class="hero">
+    <h1>${escapeHtml(config.tagline)}</h1>
+    <p>${escapeHtml(config.description)}</p>
+  </section>
+  ${recent.length ? `<ul class="post-list">${recent.map(postCard).join('\n')}</ul>` : '<p style="padding:2rem 0">No posts yet.</p>'}
+  ${posts.length > recent.length ? `<p style="margin-top:1.5rem"><a href="/archive/">All ${posts.length} posts &rarr;</a></p>` : ''}
+</div>`,
+}));
+
+// --- archive ---
+const byYear = {};
+for (const p of posts) (byYear[String(p.date).slice(0, 4)] ||= []).push(p);
+
+write('archive/index.html', layout({
+  title: 'Archive',
+  description: 'Every post on ' + config.title + ', newest first.',
+  canonical: abs('/archive/'),
+  navKey: 'archive',
+  body: `<div class="wrap">
+  <section class="hero"><h1>Archive</h1><p>${posts.length} post${posts.length === 1 ? '' : 's'}, newest first.</p></section>
+  ${Object.keys(byYear).sort().reverse().map((year) => `
+  <h2 style="font-family:var(--mono);font-size:.8rem;letter-spacing:.1em;color:var(--ink-faint);margin:2rem 0 0">${year}</h2>
+  <ul class="post-list">${byYear[year].map(postCard).join('\n')}</ul>`).join('')}
+</div>`,
+}));
+
+// --- topics ---
+const byTag = {};
+for (const p of posts) for (const t of p.tags) (byTag[t] ||= []).push(p);
+const tagNames = Object.keys(byTag).sort((a, b) => byTag[b].length - byTag[a].length || a.localeCompare(b));
+
+write('topics/index.html', layout({
+  title: 'Topics',
+  description: 'Browse ' + config.title + ' by topic.',
+  canonical: abs('/topics/'),
+  navKey: 'topics',
+  body: `<div class="wrap">
+  <section class="hero"><h1>Topics</h1><p>Every subject this blog has measured.</p></section>
+  <ul class="post-list">${tagNames.map((t) => `<li><h2><a href="/topics/${slugify(t)}/">${escapeHtml(t)}</a></h2><div class="meta">${byTag[t].length} post${byTag[t].length === 1 ? '' : 's'}</div></li>`).join('\n') || '<li>No topics yet.</li>'}</ul>
+</div>`,
+}));
+
+for (const t of tagNames) {
+  write(join('topics', slugify(t), 'index.html'), layout({
+    title: t,
+    description: byTag[t].length + ' post' + (byTag[t].length === 1 ? '' : 's') + ' on ' + t + '.',
+    canonical: abs('/topics/' + slugify(t) + '/'),
+    navKey: 'topics',
+    body: `<div class="wrap">
+  <section class="hero"><h1>${escapeHtml(t)}</h1><p>${byTag[t].length} post${byTag[t].length === 1 ? '' : 's'}.</p></section>
+  <ul class="post-list">${byTag[t].map(postCard).join('\n')}</ul>
+</div>`,
+  }));
+}
+
+// --- static pages ---
+for (const pg of pages) {
+  const { html } = renderMarkdown(pg.body, { host: config.url });
+  write(join(pg.slug, 'index.html'), layout({
+    title: pg.title,
+    description: pg.description || config.description,
+    canonical: abs('/' + pg.slug + '/'),
+    navKey: pg.slug,
+    body: `<div class="wrap"><article>
+  <header><h1>${escapeHtml(pg.title)}</h1>${pg.description ? `<p class="standfirst">${escapeHtml(pg.description)}</p>` : ''}</header>
+  <div class="prose">${html}</div>
+</article></div>`,
+  }));
+}
+
+// --- feed ---
+// Atom rather than RSS: better date handling, and this audience reads in feed
+// readers that all support it. Full content is included so the feed is usable
+// on its own terms rather than as a teaser for clicks.
+const updated = posts.length ? toISO(posts[0].date) : new Date().toISOString();
+write('feed.xml', `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>${escapeHtml(config.title)}</title>
+  <subtitle>${escapeHtml(config.description)}</subtitle>
+  <link href="${abs('/feed.xml')}" rel="self"/>
+  <link href="${config.url}"/>
+  <updated>${updated}</updated>
+  <id>${config.url}</id>
+  <author><name>${escapeHtml(config.title)}</name></author>
+${posts.slice(0, 25).map((p) => {
+  const { html } = renderMarkdown(p.body, { host: config.url });
+  return `  <entry>
+    <title>${escapeHtml(p.title)}</title>
+    <link href="${abs(postUrl(p))}"/>
+    <id>${abs(postUrl(p))}</id>
+    <updated>${toISO(p.updated || p.date)}</updated>
+    <published>${toISO(p.date)}</published>
+    <summary>${escapeHtml(p.description)}</summary>
+${p.tags.map((t) => `    <category term="${escapeHtml(t)}"/>`).join('\n')}
+    <content type="html">${escapeHtml(html)}</content>
+  </entry>`;
+}).join('\n')}
+</feed>`);
+
+// --- sitemap ---
+const urls = [
+  { loc: abs('/'), pri: '1.0' },
+  { loc: abs('/archive/'), pri: '0.5' },
+  { loc: abs('/topics/'), pri: '0.5' },
+  ...pages.map((pg) => ({ loc: abs('/' + pg.slug + '/'), pri: '0.5' })),
+  ...tagNames.map((t) => ({ loc: abs('/topics/' + slugify(t) + '/'), pri: '0.4' })),
+  ...posts.map((p) => ({ loc: abs(postUrl(p)), pri: '0.8', lastmod: String(p.updated || p.date).slice(0, 10) })),
+];
+write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map((u) => `  <url><loc>${u.loc}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}<priority>${u.pri}</priority></url>`).join('\n')}
+</urlset>`);
+
+write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${abs('/sitemap.xml')}\n`);
+
+// GitHub Pages runs Jekyll by default, which silently drops files and folders
+// beginning with an underscore. This opts out.
+write('.nojekyll', '');
+
+if (config.cname) write('CNAME', config.cname + '\n');
+
+// --- 404 ---
+write('404.html', layout({
+  title: 'Not found',
+  description: 'That page does not exist.',
+  canonical: abs('/404.html'),
+  body: `<div class="wrap"><section class="hero">
+  <h1>404</h1>
+  <p>That page does not exist. Try the <a href="/archive/">archive</a>.</p>
+</section></div>`,
+}));
+
+// --- favicon: the brand mark, drawn as SVG so there is no binary to manage ---
+write('favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<rect width="32" height="32" rx="7" fill="#14140f"/>
+<path d="M7 21.5 L11.5 10.5 M13.5 21.5 L18 10.5" stroke="#f0913a" stroke-width="2.6" stroke-linecap="round"/>
+<rect x="21" y="10.5" width="4" height="11" rx="1.4" fill="#f0913a" opacity="0.55"/>
+</svg>`);
+
+copyFileSync(join(ROOT, 'engine', 'theme.css'), join(OUT, 'theme.css'));
+copyDirInto(join(ROOT, 'assets'), 'assets');
+
+// ---------------------------------------------------------------------------
+// Report
+// ---------------------------------------------------------------------------
+
+const drafts = allPosts.length - posts.length;
+console.log(
+  'built ' + posts.length + ' post' + (posts.length === 1 ? '' : 's') +
+  ', ' + pages.length + ' page' + (pages.length === 1 ? '' : 's') +
+  ', ' + tagNames.length + ' topic' + (tagNames.length === 1 ? '' : 's') +
+  (drafts > 0 ? ' (' + drafts + ' draft' + (drafts === 1 ? '' : 's') + ' held back)' : '') +
+  ' -> docs/'
+);

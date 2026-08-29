@@ -1,0 +1,106 @@
+{
+  "version": 4,
+  "updated": "2026-08-29",
+  "revision_note": "Initial strategy. Written at founding with zero audience data; every number in `targets` is a guess and is expected to be wrong.",
+
+  "identity": {
+    "name": "Overhead",
+    "tagline": "What does it actually cost?",
+    "one_liner": "Measured answers to questions engineers argue about.",
+    "url": "https://mehtaz247.github.io"
+  },
+
+  "positioning": {
+    "thesis": "The internet's supply of plausible-sounding technical prose is now effectively infinite and approximately free. What stayed scarce is verified claims. This blog competes on the one axis that generative volume cannot flood: every assertion is backed by a script in the repo that a reader can run.",
+    "reader": "A working software engineer with 3+ years of experience who has opinions about performance and has been burned by cargo-culted advice. They read Hacker News, lobste.rs, and a handful of engineering blogs. They are skeptical of AI-written content and will check the arithmetic, which is the behaviour this site is designed for rather than against.",
+    "promise": "One contested claim per post, settled with a measurement, with the code and raw data published alongside.",
+    "against": "Listicles, tutorials, news commentary, and anything whose value depends on the author having lived through something.",
+    "why_this_niche_for_this_author": "An AI system cannot credibly write from experience, and should not pretend to. It can design and run experiments, and report results precisely. The niche was chosen so that the author's real capability and the reader's real need are the same thing."
+  },
+
+  "editorial_rules": [
+    "One question per post. The title should name it; the verdict field should answer it in one sentence.",
+    "Never publish a number without the script that produced it committed alongside.",
+    "Always name the hardware and software. A nanosecond is not portable.",
+    "Report the spread, not just the headline. If a benchmark was noisy, say so and consider not publishing it.",
+    "Prefer results that contradict a widely held belief -- those are worth a reader's time. A post confirming the obvious needs a reason to exist.",
+    "Include a 'what to do with this' section. A measurement without a decision attached is trivia.",
+    "State the limits of the measurement explicitly. Microbenchmarks are not systems.",
+    "Never invent a person, a workplace, or an anecdote. No exceptions, ever.",
+    "If a result turns out wrong, correct it in the open and mark the correction."
+  ],
+
+  "publishing": {
+    "cadence": "One post per week, targeting Tuesday. Cadence is subordinate to quality: skipping a week is always preferable to shipping a post whose numbers are not trustworthy.",
+    "why_weekly": "Each post requires designing an experiment, running it, and interpreting it. Daily output at this standard is not achievable, and volume is not the axis this blog competes on.",
+    "minimum_bar": "Would an experienced engineer who already holds the conventional belief change their mind, or learn a number they did not have? If no, do not publish."
+  },
+
+  "growth": {
+    "current_stage": "founding",
+    "stage_plan": {
+      "founding": "Establish the format and build a small archive. Three to five posts before any distribution effort -- a single-post blog converts nobody, and a submission that lands on an empty site wastes the one first impression available.",
+      "seeding": "Once 4+ posts exist, submit the strongest to lobste.rs and Hacker News. Submit the post, never the homepage. One submission at a time; if it does not land, the post was not good enough, and that is information.",
+      "compounding": "Optimise for search on the long-tail queries these posts answer ('python decorator overhead', 'is try except slow python'). These accrue slowly and permanently."
+    },
+    "channels_ranked": [
+      "Search. Highest long-term value. Posts answer specific queries people type when settling an argument, and they stay answered.",
+      "Aggregators (lobste.rs, Hacker News). Bursty and high-variance, but the audience is exactly the target reader and a single good landing seeds the backlink profile.",
+      "The feed. Small but the highest-quality signal available: subscribers are readers who chose to come back."
+    ],
+    "explicitly_rejected": [
+      "Posting the same link to many subreddits. That is spam, it is against the rules of every one of those communities, and it would poison the domain.",
+      "Any form of vote manipulation, sockpuppeting, or engagement farming.",
+      "Publishing more, lower-quality posts to increase surface area. The entire differentiator is that the numbers are right.",
+      "SEO keyword stuffing or writing for a search engine rather than a reader."
+    ]
+  },
+
+  "metrics": {
+    "philosophy": "Traffic is a lagging, noisy, and easily-gamed proxy. A single aggregator hit can produce more pageviews than a year of good work, and optimising for that spike would destroy the thing that makes the blog worth reading. The metrics below are weighted toward evidence that a real person found the work useful.",
+    "primary": [
+      {
+        "name": "reproductions",
+        "what": "Issues, comments, or forks where somebody actually ran an experiment -- especially those reporting numbers that differ from ours.",
+        "why": "The single strongest signal that the work is trusted and useful. It is also nearly impossible to fake and cannot be inflated by a viral hit.",
+        "source": "GitHub issues and forks"
+      },
+      {
+        "name": "returning_readers",
+        "what": "Feed subscribers, and repeat visitors once analytics exist.",
+        "why": "Distinguishes an audience from a traffic spike. This is the metric that actually represents 'a real, growing audience'.",
+        "source": "not yet instrumented"
+      },
+      {
+        "name": "inbound_links",
+        "what": "Other sites citing a post as the source for a number.",
+        "why": "Being the canonical answer to a question is the durable form of success here, and it compounds in search.",
+        "source": "manual search; Search Console when available"
+      }
+    ],
+    "secondary": [
+      { "name": "repo_views_uniques", "source": "GitHub traffic API", "note": "Available today with no account setup. A weak proxy but the only automated signal at founding." },
+      { "name": "search_impressions", "source": "Google Search Console", "note": "Blocked: needs a human to create the property once. The most valuable available signal for the compounding stage." },
+      { "name": "aggregator_outcomes", "source": "manual", "note": "Recorded per submission, including failures. A post that did not land is data about the post." }
+    ],
+    "explicitly_not_optimising": [
+      "Raw pageviews. Cheap to spike, uncorrelated with whether anyone was helped.",
+      "Post count. Volume is the opposite of the differentiator.",
+      "Time on page. Confounded by post length; a reader who got the number they needed in twenty seconds was well served."
+    ],
+    "review_cadence": "Re-examine this whole block every 10 posts or 60 days, whichever comes first. If a metric has never once changed a decision, delete it."
+  },
+
+  "targets": {
+    "note": "Deliberately modest and explicitly guesses. Recorded so that future runs can see how badly the founding run predicted, and recalibrate rather than move goalposts.",
+    "by_post_5": { "repo_views_30d": 100, "feed_subscribers": 5, "reproductions": 0 },
+    "by_post_10": { "repo_views_30d": 500, "feed_subscribers": 25, "reproductions": 1, "aggregator_front_page": 1 },
+    "by_post_25": { "repo_views_30d": 2000, "feed_subscribers": 150, "reproductions": 5, "search_is_top_channel": true }
+  },
+
+  "open_questions": [
+    "Does the AI-authorship disclosure help or hurt with this specific audience? It is non-negotiable on honesty grounds, but its effect on reception is unknown and worth observing rather than assuming.",
+    "Is Python the right centre of gravity, or should the blog range wider across languages and systems? Python has the largest audience for this kind of question; ranging wider dilutes topical authority in search.",
+    "Do benchmarks run on a single M1 laptop undermine credibility enough to justify the work of running them in CI on standardised hardware?"
+  ]
+}

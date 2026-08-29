@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Overhead</title>
+  <subtitle>Measured answers to questions engineers argue about. Every number here comes from a script you can run yourself.</subtitle>
+  <link href="https://mehtaz247.github.io/feed.xml" rel="self"/>
+  <link href="https://mehtaz247.github.io"/>
+  <updated>2026-08-29T12:00:00.000Z</updated>
+  <id>https://mehtaz247.github.io</id>
+  <author><name>Overhead</name></author>
+  <entry>
+    <title>What a Python function call actually costs</title>
+    <link href="https://mehtaz247.github.io/p/python-call-overhead/"/>
+    <id>https://mehtaz247.github.io/p/python-call-overhead/</id>
+    <updated>2026-08-29T12:00:00.000Z</updated>
+    <published>2026-08-29T12:00:00.000Z</published>
+    <summary>Thirty-two ways to invoke code in CPython 3.13, measured on the same machine in the same run. The expensive part of a decorator is not the decorating.</summary>
+    <category term="Python"/>
+    <category term="performance"/>
+    <category term="benchmarks"/>
+    <content type="html">&lt;p&gt;Everyone knows Python function calls are slow. Almost nobody knows &lt;em&gt;how&lt;/em&gt; slow,
+or which parts of the call are responsible, and that gap is where a lot of bad
+optimisation decisions live. People strip out helper functions that cost
+nothing and keep decorators that cost four times as much as the code they wrap.&lt;/p&gt;
+&lt;p&gt;So here is the table. Every row was measured in the same process, on the same
+machine, in the same run, with the statement inlined directly into the timing
+loop so that nothing but the operation itself sits between the two clock reads.&lt;/p&gt;
+&lt;h2 id=&quot;the-numbers&quot;&gt;The numbers&lt;a class=&quot;anchor&quot; href=&quot;#the-numbers&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Operation&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;ns/op&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;vs. a plain call&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;integer addition&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.29&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;0.17x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;local variable read&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.45&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;0.18x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;global function lookup, no call&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.34&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;0.17x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;attribute on a &lt;code&gt;__dict__&lt;/code&gt; class&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;4.24&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;0.32x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;attribute on a &lt;code&gt;__slots__&lt;/code&gt; class&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;4.34&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;0.32x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;list.append&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;8.00&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;0.60x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;plain dict lookup&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;8.29&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;0.62x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;len()&lt;/code&gt; on a list&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;9.04&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;0.68x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;isinstance()&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;9.57&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;0.72x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;strong&gt;plain function, no args&lt;/strong&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;13.4&lt;/strong&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;1.00x&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;lambda, no args&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;13.5&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.01x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;prebound method&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;15.2&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.14x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;@property&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;16.7&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.25x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;method call, &lt;code&gt;obj.method()&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;16.6&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.24x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;3 defaults, none passed&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;18.6&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.39x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;3 positional args&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;20.5&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.53x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;functools.cache&lt;/code&gt; hit&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;21.5&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.61x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;functools.lru_cache&lt;/code&gt; hit&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;23.0&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.72x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;staticmethod&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;27.6&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.06x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;decorator, exact signature&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;27.9&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.09x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;functools.partial&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;29.9&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.24x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;3 keyword args&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;32.8&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.46x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;instance &lt;code&gt;__call__&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;33.4&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.50x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;*args&lt;/code&gt; / &lt;code&gt;**kwargs&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;35.9&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.69x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;classmethod&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;44.0&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;3.29x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;__getattr__&lt;/code&gt; fallback&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;44.5&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;3.33x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;strong&gt;decorator, &lt;code&gt;*args&lt;/code&gt;/&lt;code&gt;**kwargs&lt;/code&gt;&lt;/strong&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;51.9&lt;/strong&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;3.88x&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;three stacked decorators&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;135.5&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;10.13x&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;Two rows that are not in the &amp;quot;cost of calling&amp;quot; story but are worth having on the
+same scale:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Operation&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;ns/op&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;vs. a plain call&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;try&lt;/code&gt;/&lt;code&gt;except&lt;/code&gt;, nothing raised&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.31&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;0.17x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;raise&lt;/code&gt; + catch, preallocated exception&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;51.6&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;3.86x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;raise&lt;/code&gt; + catch, fresh exception&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;89.4&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;6.68x&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;h2 id=&quot;what-is-actually-going-on&quot;&gt;What is actually going on&lt;a class=&quot;anchor&quot; href=&quot;#what-is-actually-going-on&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;A call costs about 13 nanoseconds, and that is the floor.&lt;/strong&gt; Not the arguments,
+not the lookup — the act of pushing a frame and coming back. For scale, that is
+roughly six integer additions or three attribute reads. If a function does any
+real work at all, the call is already noise. If it does nothing but return a
+value, the call &lt;em&gt;is&lt;/em&gt; the work.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Arguments are not free, and keyword arguments are much less free.&lt;/strong&gt; Three
+positional arguments add 7ns over a bare call. The same three passed by keyword
+add 19ns — nearly triple. Keyword arguments have to be matched against the
+function&amp;#39;s parameter names at call time, and that matching shows up here plainly.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;The interesting result is the decorator.&lt;/strong&gt; A no-op decorator — the kind every
+codebase has a dozen of, for logging or timing or auth — turns a 13.4ns call into
+a 51.9ns call. It nearly quadruples the cost of the function it wraps, while
+doing nothing.&lt;/p&gt;
+&lt;p&gt;But the reason is not what most people assume. Here are three decorators that
+are identical except for how the wrapper forwards its arguments:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Wrapper&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;ns/op&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;def wrapper(*args, **kwargs): return fn(*args, **kwargs)&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;51.9&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;def wrapper(): return fn()&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;27.9&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;same, without &lt;code&gt;functools.wraps&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;28.3&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;Declaring the exact signature nearly halves the cost. And &lt;code&gt;functools.wraps&lt;/code&gt;,
+which is widely suspected of being the expensive part, is free at call time — it
+runs once at decoration time, copying &lt;code&gt;__name__&lt;/code&gt; and friends, and never appears
+in the hot path again.&lt;/p&gt;
+&lt;p&gt;The cost of a decorator is almost entirely &lt;strong&gt;argument repacking&lt;/strong&gt;. The generic
+wrapper collects the caller&amp;#39;s arguments into a fresh tuple and a fresh dict,
+then immediately unpacks them again for the inner call. Two allocations and two
+teardowns, per call, to move arguments a distance of zero.&lt;/p&gt;
+&lt;figure class=&quot;code&quot;&gt;&lt;span class=&quot;code-lang&quot;&gt;python&lt;/span&gt;&lt;pre&gt;&lt;code class=&quot;language-python&quot;&gt;# 51.9 ns per call: builds a tuple and a dict, then throws them away
+def timed(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        return fn(*args, **kwargs)
+    return wrapper
+
+# 27.9 ns per call: same behaviour, no repacking
+def timed(fn):
+    @functools.wraps(fn)
+    def wrapper(request):
+        return fn(request)
+    return wrapper&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;This is only available when a decorator is applied to functions of a known
+shape, which — for the internal, single-purpose decorators that make up most of
+any codebase — is nearly always. A general-purpose decorator published in a
+library does need &lt;code&gt;*args&lt;/code&gt;/&lt;code&gt;**kwargs&lt;/code&gt;, and pays for it.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Stacking is multiplicative and it adds up fast.&lt;/strong&gt; Three no-op decorators cost
+135.5ns, a bit more than three times one. A request handler wrapped in
+authentication, logging, and rate limiting has spent 135ns before the first line
+of its body runs. That is still only 0.1 microseconds — irrelevant for a handler
+that will touch a database — but it is not irrelevant at 10,000 calls inside a
+loop, which is exactly where these get applied without anyone noticing.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;try&lt;/code&gt;/&lt;code&gt;except&lt;/code&gt; is genuinely free when nothing raises.&lt;/strong&gt; 2.31ns, which is inside
+the noise of the &lt;code&gt;y = 1&lt;/code&gt; statement it wraps. CPython 3.11 moved exception
+handling to a zero-cost model: the handler is a side table consulted only when
+an exception actually propagates, so entering a &lt;code&gt;try&lt;/code&gt; block emits no instructions
+at all. The old advice to hoist &lt;code&gt;try&lt;/code&gt; out of hot loops is now obsolete.&lt;/p&gt;
+&lt;p&gt;Raising is a different story. A caught exception costs 89.4ns with a fresh
+instance and 51.6ns with a preallocated one — the gap being the cost of
+constructing the exception object and its traceback. Exceptions as control flow
+in a hot loop are about seven plain calls each.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;lru_cache&lt;/code&gt; is fast, but a dict is faster.&lt;/strong&gt; A cache hit costs 21.5–23.0ns
+against 8.29ns for a bare dict lookup. &lt;code&gt;lru_cache&lt;/code&gt; is implemented in C and is a
+good default, but it is still doing real work per hit: building a key from the
+arguments, checking the bound, moving the entry in the recency list. When the
+key is already a single hashable value and eviction is not needed, a plain dict
+is a third of the price.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;classmethod&lt;/code&gt; is the surprise at 44.0ns&lt;/strong&gt;, more than three times a plain call
+and 60% more than a &lt;code&gt;staticmethod&lt;/code&gt;. The class object has to be resolved and
+bound as the first argument on every call. Alternative constructors called in a
+loop are worth noticing.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;&lt;code&gt;__slots__&lt;/code&gt; did not make attribute access faster.&lt;/strong&gt; 4.34ns against 4.24ns for
+an ordinary instance dict — a difference well inside the noise. This surprises
+people who reach for &lt;code&gt;__slots__&lt;/code&gt; as a speed optimisation. It is a &lt;em&gt;memory&lt;/em&gt;
+optimisation; CPython&amp;#39;s attribute lookup has been fast for ordinary classes for
+years, and since 3.11 the specialising interpreter caches the lookup for both
+shapes.&lt;/p&gt;
+&lt;h2 id=&quot;what-to-do-with-this&quot;&gt;What to do with this&lt;a class=&quot;anchor&quot; href=&quot;#what-to-do-with-this&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Most of the time, nothing. A 13ns call is invisible next to a 200-microsecond
+database round trip, and code arranged for readability is worth far more than
+these differences. The numbers matter in one specific place: inside loops that
+run often enough that nanoseconds multiply into something a profiler will show
+you.&lt;/p&gt;
+&lt;p&gt;When you are in that place, the ranking that matters is:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Remove the call from the loop entirely&lt;/strong&gt; if you can — hoist it, or inline it. Nothing else on this list saves 13ns.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Fix the decorator wrappers&lt;/strong&gt; on anything hot. Halving a decorator&amp;#39;s cost by writing the real signature is the cheapest real win here, and it is a mechanical change.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Pass positionally&lt;/strong&gt; in hot paths. 19ns of the difference between keyword and positional is free to reclaim and costs only a little readability.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Reach for a dict&lt;/strong&gt; instead of &lt;code&gt;lru_cache&lt;/code&gt; when the key is already a single value and you do not need eviction.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Stop worrying about &lt;code&gt;try&lt;/code&gt;/&lt;code&gt;except&lt;/code&gt;.&lt;/strong&gt; It is free now.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;And do not use &lt;code&gt;__slots__&lt;/code&gt; for speed. Use it for memory, which is what it is for.&lt;/p&gt;
+&lt;aside class=&quot;callout callout-note&quot;&gt;&lt;p class=&quot;callout-label&quot;&gt;NOTE&lt;/p&gt;&lt;p&gt;These are figures from one machine and one interpreter: an Apple M1, CPython
+3.13.0, arm64. The absolute nanoseconds will differ on x86, on a different
+CPython, and dramatically on PyPy, which compiles most of this away. The
+&lt;em&gt;ratios&lt;/em&gt; are what travel, and even those should be re-measured before anyone
+refactors on their strength. The script is in the repository; run it on your
+own hardware and see.&lt;/p&gt;&lt;/aside&gt;
+&lt;h2 id=&quot;method&quot;&gt;Method&lt;a class=&quot;anchor&quot; href=&quot;#method&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Each statement is compiled directly into the body of a timing loop, the way
+&lt;code&gt;timeit&lt;/code&gt; does it, rather than being wrapped in a callable. That distinction is
+load-bearing: measuring &lt;code&gt;lambda: x.y&lt;/code&gt; would silently add a full 13ns function
+call to every result, which is larger than most of the things on this list.&lt;/p&gt;
+&lt;p&gt;An empty loop is timed under identical conditions and subtracted, so each figure
+is the marginal cost of the operation rather than the cost of the operation plus
+a &lt;code&gt;for&lt;/code&gt;. Iteration counts are calibrated so a trial runs at least 50ms, putting
+timer resolution well below the noise. Each statement runs nine trials, and the
+&lt;strong&gt;minimum&lt;/strong&gt; is reported: timing noise on a general-purpose OS is additive, so the
+fastest observed run is the closest estimate of the true cost. The median and
+the spread are recorded in the raw JSON, and no figure here came from a run with
+a spread above 15%.&lt;/p&gt;
+&lt;p&gt;Garbage collection is disabled during measurement. That is a real distortion —
+GC is not free in production — but allocation rates inside a microbenchmark
+loop bear no relation to a real workload, so leaving it on measures the harness
+rather than the operation.&lt;/p&gt;
+&lt;p&gt;The harness has [its own test suite][selftest] which checks the properties that
+must hold if the timing is sound: that an empty statement registers as free,
+that ten copies of a statement cost about ten times one copy, that setup code
+does not leak into the measurement, and that two runs of the same statement
+agree. Those tests pass on the machine that produced this table.&lt;/p&gt;
+&lt;p&gt;[selftest]: https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/selftest.py&lt;/p&gt;</content>
+  </entry>
+</feed>
