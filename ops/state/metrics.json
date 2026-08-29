@@ -1,0 +1,23 @@
+{
+  "note": "Time series of whatever signal is available. GitHub traffic figures are rolling 14-day windows, not cumulative totals -- never sum them across snapshots. Pageview data requires an analytics property that only a human can create; see ops/state/needs-human.md.",
+  "snapshots": [
+    {
+      "date": "2026-08-29",
+      "posts_published": 1,
+      "drafts": 0,
+      "experiments_with_results": 1,
+      "stars": 0,
+      "forks": 0,
+      "watchers": 0,
+      "views_14d": 0,
+      "unique_visitors_14d": 0,
+      "clones_14d": 0,
+      "unique_cloners_14d": 0,
+      "referrers": [],
+      "top_paths": [],
+      "issues_total": 0,
+      "issues_from_others": 0,
+      "reproductions": []
+    }
+  ]
+}
