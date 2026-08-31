@@ -1,0 +1,13 @@
+{
+  "note": "Independent check of the scan slope using stdlib timeit.",
+  "timeit_ns_per_element": 15.73,
+  "harness_ns_per_element": 14.96,
+  "disagreement_pct": 5.1,
+  "timeit_raw_ns": {
+    "2": 44.85,
+    "64": 1019.87
+  },
+  "empty_loop_ns": 10.33,
+  "repeat": 101,
+  "number": 20000
+}

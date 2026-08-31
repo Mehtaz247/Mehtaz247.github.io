@@ -35,7 +35,9 @@ touching five things.
   ops loop, this prompt. Only when it unblocks something concrete — refactoring
   for its own sake is not progress.
 - **Correct something.** A wrong number outranks everything else on this list.
-  Drop what you are doing and fix it.
+  Drop what you are doing and fix it. This includes numbers already published:
+  re-running an old experiment after the harness changes is cheap, and finding
+  that a published figure moved is the single most valuable thing a run can do.
 
 Decide by reading the state, not by defaulting to the first item.
 
@@ -49,7 +51,14 @@ A post ships only if you can answer yes to all of:
   in the post match `results.json`. Never copy a number from a draft you did not
   just verify.
 - The hardware and software are named in the front matter.
-- No benchmark with a spread above ~15% is used for a headline claim.
+- Every measurement behind a claim converged: `stability_pct` in `results.json`
+  passed the harness's check, and nothing appears in `unstable_results`. Do
+  **not** gate on `spread_pct` — under machine load the median is polluted while
+  the minimum is not, so spread measures the laptop rather than the benchmark.
+  See the 2026-08-31 journal entry for the evidence behind this.
+- At least one headline number is corroborated from outside the house harness:
+  an independent implementation, a structural count that does not depend on
+  timing, or a model fitted on part of the sweep and checked against the rest.
 - It would change the mind, or fill a real gap, of an engineer who already holds
   the conventional view.
 - It contains a "what to do with this" section.

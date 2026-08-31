@@ -118,6 +118,52 @@ check('footnotes number in reference order', () => {
   if (first < 0) throw new Error('no first footnote marker');
 });
 
+// --- figure includes --------------------------------------------------------
+// Charts are generated from results.json and inlined, so the renderer must
+// splice the file in verbatim, must not escape it, and must fail loudly when
+// it cannot be resolved -- a silently missing chart is a published post with a
+// hole where its evidence should be.
+check('figure include inlines the resolved file', () => {
+  const { html } = renderMarkdown('!figure[A caption](assets/charts/x.svg)', {
+    include: (p) => '<svg id="' + p + '"></svg>',
+  });
+  if (!html.includes('<svg id="assets/charts/x.svg"></svg>')) throw new Error('not inlined: ' + html);
+  if (!html.includes('<figure class="chart">')) throw new Error('no figure wrapper: ' + html);
+  if (!html.includes('<figcaption>A caption</figcaption>')) throw new Error('no caption: ' + html);
+});
+check('figure caption renders inline markdown', () => {
+  const { html } = renderMarkdown('!figure[**bold** and `code`](a/b.svg)', { include: () => '<svg/>' });
+  if (!html.includes('<strong>bold</strong>')) throw new Error('caption not rendered: ' + html);
+});
+check('a figure with no caption omits the figcaption', () => {
+  const { html } = renderMarkdown('!figure[](a/b.svg)', { include: () => '<svg/>' });
+  if (html.includes('figcaption')) throw new Error('unexpected figcaption: ' + html);
+});
+check('a figure with no include resolver throws', () => {
+  let threw = false;
+  try { renderMarkdown('!figure[x](a/b.svg)'); } catch (e) { threw = true; }
+  if (!threw) throw new Error('expected a throw');
+});
+check('an unresolvable figure propagates the error', () => {
+  let threw = false;
+  try {
+    renderMarkdown('!figure[x](a/b.svg)', { include: () => { throw new Error('nope'); } });
+  } catch (e) { threw = true; }
+  if (!threw) throw new Error('expected a throw');
+});
+check('a figure directive is not swallowed into a paragraph', () => {
+  const { html } = renderMarkdown('Some text.\n!figure[c](a/b.svg)\nMore text.', {
+    include: () => '<svg/>',
+  });
+  if (!html.includes('<figure class="chart">')) throw new Error('paragraph ate the figure: ' + html);
+  if (!html.includes('More text.')) throw new Error('lost trailing text: ' + html);
+});
+check('text that merely looks like a figure is left alone', () => {
+  const { html } = renderMarkdown('write !figure[x](y.svg) inline to include a chart',
+    { include: () => { throw new Error('should not be called'); } });
+  if (!html.startsWith('<p>')) throw new Error('expected a paragraph: ' + html);
+});
+
 // --- misc -------------------------------------------------------------------
 has('---', '<hr>', 'thematic break');
 has('<!--html-->\n<div class="x">raw</div>\n<!--/html-->', '<div class="x">raw</div>', 'raw html escape hatch');

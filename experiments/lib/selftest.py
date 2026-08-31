@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bench import bench, NOISE_FLOOR_NS  # noqa: E402
+from bench import bench, Result, NOISE_FLOOR_NS, _loadavg  # noqa: E402
 
 failures: list[str] = []
 passed = 0
@@ -77,7 +77,56 @@ slow_setup = bench("slow setup", "y = len(data)", setup="data = list(range(20000
 check("setup cost is excluded from per-op timing", slow_setup.ns_per_op < 200,
       f"got {slow_setup.ns_per_op:.2f} ns/op")
 
+# --- 8. The sampling plan must adapt to the cost of the operation -----------
+# A cheap operation needs many short windows so that at least one of them lands
+# between scheduler preemptions; an expensive one does not, and paying for 101
+# trials of it would make a suite take hours.
+fast = bench("cheap op", "y = x + 1", setup="x = 41")            # nanoseconds
+mid = bench("mid op", "y = sorted(data)", setup="data = list(range(20000))[::-1]")   # ~0.2 ms
+slow = bench("expensive op", "y = sorted(data)", setup="data = list(range(400000))[::-1]")  # ~5 ms
+check("a cheap operation is sampled many times", fast.trials >= 101,
+      f"got {fast.trials} trials for {fast.ns_per_op:.1f} ns/op")
+check("an expensive operation is sampled few times", slow.trials <= 31,
+      f"got {slow.trials} trials for {slow.ns_per_op / 1e6:.2f} ms/op")
+check("sampling falls monotonically as the operation gets more expensive",
+      fast.trials > mid.trials > slow.trials,
+      f"{fast.trials} ({fast.ns_per_op:.0f}ns) > {mid.trials} ({mid.ns_per_op / 1e6:.2f}ms)"
+      f" > {slow.trials} ({slow.ns_per_op / 1e6:.2f}ms)")
+
+# --- 8b. A trial window must actually last about as long as it was asked to -
+# If the iteration count were derived from a badly wrong cost estimate, every
+# statistic above would be computed over windows too short to mean anything.
+check("a trial window is at least the requested length", mid.window_ms >= 18.0,
+      f"window was {mid.window_ms:.1f} ms over {mid.iterations} iterations")
+check("a cheap operation's window is long enough for timer resolution to vanish",
+      fast.window_ms >= 5.0,
+      f"window was {fast.window_ms:.3f} ms over {fast.iterations} iterations")
+check("an explicit trial count still overrides the plan",
+      bench("forced", "y = x + 1", setup="x = 41", trials=7).trials == 7)
+
+# --- 9. Stability must detect a floor that did not converge -----------------
+# Constructed rather than observed: a synthetic sample set whose two halves
+# disagree about the minimum has to be reported as untrustworthy, and one whose
+# halves agree has to pass. This is the check that gates publication, so it is
+# tested against known inputs rather than against a live measurement.
+converged = Result(name="x", ns_per_op=100.0, median_ns=180.0, spread_pct=80.0,
+                   iterations=1000, trials=100, stability_pct=1.0)
+diverged = Result(name="x", ns_per_op=100.0, median_ns=105.0, spread_pct=5.0,
+                  iterations=1000, trials=100, stability_pct=22.0)
+check("a converged minimum is publishable despite a noisy median", converged.trustworthy)
+check("a divergent minimum is refused despite a tight median", not diverged.trustworthy)
+
+# The live version of the same property: an honest measurement's halves agree.
+check("a real measurement's halves agree on the floor", fast.stability_pct <= 10.0,
+      f"stability={fast.stability_pct:.1f}%")
+
+# --- 10. The percentile floor must sit between the minimum and the median ---
+check("p10 lies between the minimum and the median",
+      fast.ns_per_op <= fast.p10_ns <= max(fast.median_ns, fast.ns_per_op),
+      f"min={fast.ns_per_op:.2f} p10={fast.p10_ns:.2f} median={fast.median_ns:.2f}")
+
 print(f"\nnoise floor: {NOISE_FLOOR_NS} ns")
+print(f"load average during this run: {_loadavg()}")
 
 if failures:
     print(f"\nFAILED {len(failures)} of {passed + len(failures)} checks")

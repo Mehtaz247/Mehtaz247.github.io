@@ -327,6 +327,20 @@ td:first-child { white-space: normal; }
 
 .prose img { max-width: 100%; height: auto; border-radius: var(--radius); }
 
+/* Generated charts. The SVG is inlined rather than loaded through <img> so it
+   inherits the theme variables and follows the light/dark toggle; sizing is
+   handled here rather than in the SVG so one generator serves every layout. */
+figure.chart { margin: 1.75rem 0; }
+figure.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+figure.chart figcaption {
+  margin-top: .6rem;
+  font-size: .82rem;
+  line-height: 1.5;
+  color: var(--ink-muted);
+  border-left: 2px solid var(--rule-firm);
+  padding-left: .7rem;
+}
+
 /* Inline bar charts, drawn in HTML so there is no chart library to break. */
 .bars { margin: 1.5rem 0; display: grid; gap: .45rem; }
 .bars .row { display: grid; grid-template-columns: minmax(6rem, 11rem) 1fr auto; gap: .7rem; align-items: center; font-size: .84rem; }

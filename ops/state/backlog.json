@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-29",
+  "updated": "2026-08-31",
   "note": "Candidate posts. `contested_belief` is the thing readers currently believe that the post would test -- an idea without one is usually not worth writing, because confirming the obvious does not earn a reader's time. Ideas are pruned as aggressively as they are added.",
   "ready": [
     {
@@ -12,24 +12,24 @@
       "confidence_it_is_interesting": "high"
     },
     {
-      "slug": "dict-vs-list-crossover",
-      "title": "At what size does a dict beat a list?",
-      "question": "Linear scan over a list versus a hash lookup: where is the crossover, really?",
-      "contested_belief": "Dicts are faster than lists for lookup, full stop.",
-      "why_now": "The crossover is much larger than most people guess, because a linear scan over a small contiguous list is extremely cache-friendly. A concrete crossover number is genuinely useful and easy to verify.",
-      "design": "Sweep container size from 1 to ~10000, measure hit and miss separately (miss is the worst case for the list and is where the honest answer lives). Chart it.",
+      "slug": "index-selectivity-crossover",
+      "question": "At what selectivity does SQLite stop using an index and scan the table instead?",
+      "contested_belief": "An index always makes a query faster; if a query is slow, add an index.",
+      "why_now": "Direct sequel to the SELECT * post, which showed the access path is what actually matters. The planner abandons an index somewhere around 'a few percent of rows', and almost nobody knows the number or that it exists. EXPLAIN QUERY PLAN makes the switch point directly observable, and ANALYZE/STAT4 changes it -- so the post can show the planner making a decision, not just a timing curve. The engine can now render generated charts (added for post 3), and this experiment is a sweep whose whole point is a curve with a switch point in it, so it is the natural next use of that.",
+      "design": "Fixed table, sweep the fraction of matching rows from 0.01% to 100%. Record the plan at each point alongside the timing, with and without ANALYZE. The crossover is the headline number.",
+      "confidence_it_is_interesting": "high"
+    },
+    {
+      "slug": "hashable-key-cost",
+      "title": "What does a bad dict key cost?",
+      "question": "How much does the choice of key type change the cost of a dict, and when is a tuple key the wrong shape?",
+      "contested_belief": "A dict lookup is O(1), so the key type does not matter.",
+      "why_now": "Fell directly out of post 3, which measured but did not pursue it: `str` caches its hash on the object and `tuple` does not, so a set lookup went from 47ns on ints to 42ns on strings and 62ns on tuples -- the string got *faster* than the integer. That is a 1.5x spread on the operation people assume is free and constant, decided entirely by a choice made when the key was designed.",
+      "design": "Sweep key types through a dict: int, str (short and long, interned and not), tuple, frozenset, frozen dataclass, and a custom __hash__. Separate first-lookup cost (hash computed) from repeated-lookup cost (hash cached or not), which is the whole story for str vs tuple. Include the collision case -- a __hash__ that returns a constant is legal, and its cost is the real answer to 'is O(1) guaranteed'.",
       "confidence_it_is_interesting": "high"
     }
   ],
   "considering": [
-    {
-      "slug": "index-selectivity-crossover",
-      "question": "At what selectivity does SQLite stop using an index and scan the table instead?",
-      "contested_belief": "An index always makes a query faster; if a query is slow, add an index.",
-      "why_now": "Direct sequel to the SELECT * post, which showed the access path is what actually matters. The planner abandons an index somewhere around 'a few percent of rows', and almost nobody knows the number or that it exists. EXPLAIN QUERY PLAN makes the switch point directly observable, and ANALYZE/STAT4 changes it -- so the post can show the planner making a decision, not just a timing curve.",
-      "design": "Fixed table, sweep the fraction of matching rows from 0.01% to 100%. Record the plan at each point alongside the timing, with and without ANALYZE. The crossover is the headline number.",
-      "confidence_it_is_interesting": "high"
-    },
     {
       "slug": "rows-not-columns",
       "question": "What does a row cost to fetch, and how much of it is the driver rather than the database?",
@@ -56,6 +56,22 @@
       "question": "How much does Timsort actually gain on nearly-sorted data?",
       "contested_belief": "Sorting is O(n log n) regardless of input order.",
       "risk": "None obvious. Timsort's adaptive behaviour is real, dramatic, and under-appreciated. Promote to ready if the first three land well."
+    },
+    {
+      "slug": "constant-folding-limits",
+      "question": "What does CPython actually fold at compile time, and where does it stop?",
+      "contested_belief": "The compiler optimises the obvious things, so writing the readable form is free.",
+      "why_now": "Post 3 found that `x in {1, 2, 3}` compiles to a frozenset constant and runs 3.2x faster than the tuple form, while `x in {a, b, c}` builds a set on every evaluation and is 1.8x *slower* -- the same syntax with opposite answers, decided by whether the members are constants. That boundary is invisible in the source and nobody knows where it is.",
+      "risk": "Reads as trivia unless every finding is tied to a form people actually write. The `in {...}` result earns its place because it is a real habit; a catalogue of what the peephole optimiser does would not.",
+      "confidence_it_is_interesting": "medium-high"
+    },
+    {
+      "slug": "benchmark-noise",
+      "question": "How wrong is a microbenchmark on a machine that is doing something else?",
+      "contested_belief": "timeit gives you the number; if you want it cleaner, run more repeats.",
+      "why_now": "Post 3's harness work produced the raw material without meaning to: the same set lookup read anywhere from 12ns to 68ns depending on sampling strategy, and the standard median-based noise check would have rejected measurements that an independent implementation agreed with to 1.3%.",
+      "risk": "High. This is a post about our own tooling, which is close to navel-gazing, and the blog's value is answers about other people's code. Only write it if it can be framed entirely as 'here is how to know whether *your* benchmark is lying to you', with the harness as an example rather than the subject.",
+      "confidence_it_is_interesting": "medium"
     }
   ],
   "rejected": [

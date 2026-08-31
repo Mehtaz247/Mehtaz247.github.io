@@ -4,9 +4,395 @@
   <subtitle>Measured answers to questions engineers argue about. Every number here comes from a script you can run yourself.</subtitle>
   <link href="https://mehtaz247.github.io/feed.xml" rel="self"/>
   <link href="https://mehtaz247.github.io"/>
-  <updated>2026-08-29T12:00:00.000Z</updated>
+  <updated>2026-08-31T12:00:00.000Z</updated>
   <id>https://mehtaz247.github.io</id>
   <author><name>Overhead</name></author>
+  <entry>
+    <title>At what size does a dict beat a list?</title>
+    <link href="https://mehtaz247.github.io/p/dict-vs-list-crossover/"/>
+    <id>https://mehtaz247.github.io/p/dict-vs-list-crossover/</id>
+    <updated>2026-08-31T12:00:00.000Z</updated>
+    <published>2026-08-31T12:00:00.000Z</published>
+    <summary>Everyone knows a set is O(1) and a list is O(n), and everyone also knows that for small collections the list wins anyway. Measured on CPython 3.13, the second half is wrong from the first element.</summary>
+    <category term="Python"/>
+    <category term="data structures"/>
+    <category term="performance"/>
+    <category term="benchmarks"/>
+    <content type="html">&lt;p&gt;Someone writes &lt;code&gt;if user_id in allowed_ids&lt;/code&gt; where &lt;code&gt;allowed_ids&lt;/code&gt; is a list, and
+someone else leaves the comment: &lt;em&gt;use a set, list membership is O(n)&lt;/em&gt;. Then the
+rebuttal, which is also standard: &lt;em&gt;not for small collections — a linear scan
+over a short contiguous array is cache-friendly, and a hash lookup has a fixed
+cost the scan doesn&amp;#39;t pay. Below ten or twenty elements the list is faster.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Both sides are quoting asymptotics at each other. Neither is quoting a number.
+Here is the number, and it is much smaller than the argument assumes.&lt;/p&gt;
+&lt;h2 id=&quot;the-crossover&quot;&gt;The crossover&lt;a class=&quot;anchor&quot; href=&quot;#the-crossover&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Container size from 1 to 10,000, sweeping &lt;code&gt;x in lst&lt;/code&gt; against &lt;code&gt;x in st&lt;/code&gt;, for a
+&lt;strong&gt;hit&lt;/strong&gt; — the probe is present, at the midpoint, which is the mean scan length
+for a uniformly random hit — and for a &lt;strong&gt;miss&lt;/strong&gt;, which is the list&amp;#39;s worst case
+and is what most membership tests actually do.&lt;/p&gt;
+&lt;figure class=&quot;chart&quot;&gt;&lt;svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 720 400&quot; width=&quot;100%&quot; role=&quot;img&quot; aria-label=&quot;Membership test cost against container size, list versus set&quot; font-family=&quot;system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif&quot;&gt;
+&lt;title&gt;Membership test cost against container size, list versus set&lt;/title&gt;
+&lt;line x1=&quot;62&quot; y1=&quot;339.2&quot; x2=&quot;604&quot; y2=&quot;339.2&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;54&quot; y=&quot;342.7&quot; text-anchor=&quot;end&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;30 ns&lt;/text&gt;
+&lt;line x1=&quot;62&quot; y1=&quot;295.9&quot; x2=&quot;604&quot; y2=&quot;295.9&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;54&quot; y=&quot;299.4&quot; text-anchor=&quot;end&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;100 ns&lt;/text&gt;
+&lt;line x1=&quot;62&quot; y1=&quot;256.4&quot; x2=&quot;604&quot; y2=&quot;256.4&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;54&quot; y=&quot;259.9&quot; text-anchor=&quot;end&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;300 ns&lt;/text&gt;
+&lt;line x1=&quot;62&quot; y1=&quot;213.1&quot; x2=&quot;604&quot; y2=&quot;213.1&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;54&quot; y=&quot;216.6&quot; text-anchor=&quot;end&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;1 µs&lt;/text&gt;
+&lt;line x1=&quot;62&quot; y1=&quot;173.6&quot; x2=&quot;604&quot; y2=&quot;173.6&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;54&quot; y=&quot;177.1&quot; text-anchor=&quot;end&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;3 µs&lt;/text&gt;
+&lt;line x1=&quot;62&quot; y1=&quot;130.3&quot; x2=&quot;604&quot; y2=&quot;130.3&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;54&quot; y=&quot;133.8&quot; text-anchor=&quot;end&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;10 µs&lt;/text&gt;
+&lt;line x1=&quot;62&quot; y1=&quot;90.7&quot; x2=&quot;604&quot; y2=&quot;90.7&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;54&quot; y=&quot;94.2&quot; text-anchor=&quot;end&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;30 µs&lt;/text&gt;
+&lt;line x1=&quot;62&quot; y1=&quot;47.5&quot; x2=&quot;604&quot; y2=&quot;47.5&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;54&quot; y=&quot;51.0&quot; text-anchor=&quot;end&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;100 µs&lt;/text&gt;
+&lt;line x1=&quot;62.0&quot; y1=&quot;354&quot; x2=&quot;62.0&quot; y2=&quot;358&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;62.0&quot; y=&quot;371&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;1&lt;/text&gt;
+&lt;line x1=&quot;126.6&quot; y1=&quot;354&quot; x2=&quot;126.6&quot; y2=&quot;358&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;126.6&quot; y=&quot;371&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;3&lt;/text&gt;
+&lt;line x1=&quot;197.5&quot; y1=&quot;354&quot; x2=&quot;197.5&quot; y2=&quot;358&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;197.5&quot; y=&quot;371&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;10&lt;/text&gt;
+&lt;line x1=&quot;262.1&quot; y1=&quot;354&quot; x2=&quot;262.1&quot; y2=&quot;358&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;262.1&quot; y=&quot;371&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;30&lt;/text&gt;
+&lt;line x1=&quot;333.0&quot; y1=&quot;354&quot; x2=&quot;333.0&quot; y2=&quot;358&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;333.0&quot; y=&quot;371&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;100&lt;/text&gt;
+&lt;line x1=&quot;397.6&quot; y1=&quot;354&quot; x2=&quot;397.6&quot; y2=&quot;358&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;397.6&quot; y=&quot;371&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;300&lt;/text&gt;
+&lt;line x1=&quot;468.5&quot; y1=&quot;354&quot; x2=&quot;468.5&quot; y2=&quot;358&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;468.5&quot; y=&quot;371&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;1,000&lt;/text&gt;
+&lt;line x1=&quot;533.1&quot; y1=&quot;354&quot; x2=&quot;533.1&quot; y2=&quot;358&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;533.1&quot; y=&quot;371&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;3,000&lt;/text&gt;
+&lt;line x1=&quot;604.0&quot; y1=&quot;354&quot; x2=&quot;604.0&quot; y2=&quot;358&quot; stroke=&quot;var(--rule, #e2ded7)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;text x=&quot;604.0&quot; y=&quot;371&quot; text-anchor=&quot;middle&quot; font-size=&quot;11&quot; fill=&quot;var(--ink-faint, #86807a)&quot;&gt;10,000&lt;/text&gt;
+&lt;line x1=&quot;62&quot; y1=&quot;354&quot; x2=&quot;604&quot; y2=&quot;354&quot; stroke=&quot;var(--rule-firm, #cbc5bb)&quot; stroke-width=&quot;1&quot;/&gt;
+&lt;polyline points=&quot;62.0,328.7 102.8,318.0 126.6,309.7 143.6,302.3 167.4,291.5 184.4,283.2 208.2,268.7 225.2,259.7 249.0,247.1 265.9,237.4 289.8,223.9 306.7,213.5 347.5,189.3 388.3,164.1 469.9,111.4 604.0,32.6&quot; fill=&quot;none&quot; stroke=&quot;var(--accent, #b4530a)&quot; stroke-width=&quot;2&quot; stroke-linejoin=&quot;round&quot;/&gt;
+&lt;circle cx=&quot;62.0&quot; cy=&quot;328.7&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;102.8&quot; cy=&quot;318.0&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;126.6&quot; cy=&quot;309.7&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;143.6&quot; cy=&quot;302.3&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;167.4&quot; cy=&quot;291.5&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;184.4&quot; cy=&quot;283.2&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;208.2&quot; cy=&quot;268.7&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;225.2&quot; cy=&quot;259.7&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;249.0&quot; cy=&quot;247.1&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;265.9&quot; cy=&quot;237.4&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;289.8&quot; cy=&quot;223.9&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;306.7&quot; cy=&quot;213.5&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;347.5&quot; cy=&quot;189.3&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;388.3&quot; cy=&quot;164.1&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;469.9&quot; cy=&quot;111.4&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;604.0&quot; cy=&quot;32.6&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;text x=&quot;613.0&quot; y=&quot;36.6&quot; font-size=&quot;12&quot; font-weight=&quot;600&quot; fill=&quot;var(--accent, #b4530a)&quot;&gt;list, miss&lt;/text&gt;
+&lt;polyline points=&quot;62.0,330.2 102.8,318.3 126.6,318.2 143.6,309.7 167.4,302.5 184.4,296.7 208.2,287.2 225.2,279.7 249.0,266.7 265.9,258.3 289.8,245.6 306.7,236.6 347.5,212.9 388.3,188.8 469.9,138.4 604.0,55.5&quot; fill=&quot;none&quot; stroke=&quot;var(--accent, #b4530a)&quot; stroke-width=&quot;2&quot; stroke-linejoin=&quot;round&quot; stroke-dasharray=&quot;5 3&quot;/&gt;
+&lt;circle cx=&quot;62.0&quot; cy=&quot;330.2&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;102.8&quot; cy=&quot;318.3&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;126.6&quot; cy=&quot;318.2&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;143.6&quot; cy=&quot;309.7&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;167.4&quot; cy=&quot;302.5&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;184.4&quot; cy=&quot;296.7&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;208.2&quot; cy=&quot;287.2&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;225.2&quot; cy=&quot;279.7&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;249.0&quot; cy=&quot;266.7&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;265.9&quot; cy=&quot;258.3&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;289.8&quot; cy=&quot;245.6&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;306.7&quot; cy=&quot;236.6&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;347.5&quot; cy=&quot;212.9&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;388.3&quot; cy=&quot;188.8&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;469.9&quot; cy=&quot;138.4&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;circle cx=&quot;604.0&quot; cy=&quot;55.5&quot; r=&quot;2.6&quot; fill=&quot;var(--accent, #b4530a)&quot;/&gt;
+&lt;text x=&quot;613.0&quot; y=&quot;59.5&quot; font-size=&quot;12&quot; font-weight=&quot;600&quot; fill=&quot;var(--accent, #b4530a)&quot;&gt;list, hit&lt;/text&gt;
+&lt;polyline points=&quot;62.0,338.2 102.8,335.3 126.6,335.2 143.6,332.6 167.4,339.3 184.4,338.7 208.2,330.6 225.2,330.4 249.0,339.4 265.9,339.0 289.8,339.0 306.7,338.6 347.5,334.2 388.3,333.6 469.9,333.5 604.0,334.8&quot; fill=&quot;none&quot; stroke=&quot;var(--ink, #171614)&quot; stroke-width=&quot;2&quot; stroke-linejoin=&quot;round&quot;/&gt;
+&lt;circle cx=&quot;62.0&quot; cy=&quot;338.2&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;102.8&quot; cy=&quot;335.3&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;126.6&quot; cy=&quot;335.2&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;143.6&quot; cy=&quot;332.6&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;167.4&quot; cy=&quot;339.3&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;184.4&quot; cy=&quot;338.7&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;208.2&quot; cy=&quot;330.6&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;225.2&quot; cy=&quot;330.4&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;249.0&quot; cy=&quot;339.4&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;265.9&quot; cy=&quot;339.0&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;289.8&quot; cy=&quot;339.0&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;306.7&quot; cy=&quot;338.6&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;347.5&quot; cy=&quot;334.2&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;388.3&quot; cy=&quot;333.6&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;469.9&quot; cy=&quot;333.5&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;604.0&quot; cy=&quot;334.8&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;text x=&quot;613.0&quot; y=&quot;348.8&quot; font-size=&quot;12&quot; font-weight=&quot;600&quot; fill=&quot;var(--ink, #171614)&quot;&gt;set, miss&lt;/text&gt;
+&lt;polyline points=&quot;62.0,322.8 102.8,322.7 126.6,323.2 143.6,322.3 167.4,322.8 184.4,323.0 208.2,323.1 225.2,322.6 249.0,323.0 265.9,322.6 289.8,322.6 306.7,322.5 347.5,323.4 388.3,323.5 469.9,323.1 604.0,323.0&quot; fill=&quot;none&quot; stroke=&quot;var(--ink, #171614)&quot; stroke-width=&quot;2&quot; stroke-linejoin=&quot;round&quot; stroke-dasharray=&quot;5 3&quot;/&gt;
+&lt;circle cx=&quot;62.0&quot; cy=&quot;322.8&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;102.8&quot; cy=&quot;322.7&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;126.6&quot; cy=&quot;323.2&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;143.6&quot; cy=&quot;322.3&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;167.4&quot; cy=&quot;322.8&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;184.4&quot; cy=&quot;323.0&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;208.2&quot; cy=&quot;323.1&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;225.2&quot; cy=&quot;322.6&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;249.0&quot; cy=&quot;323.0&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;265.9&quot; cy=&quot;322.6&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;289.8&quot; cy=&quot;322.6&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;306.7&quot; cy=&quot;322.5&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;347.5&quot; cy=&quot;323.4&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;388.3&quot; cy=&quot;323.5&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;469.9&quot; cy=&quot;323.1&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;circle cx=&quot;604.0&quot; cy=&quot;323.0&quot; r=&quot;2.6&quot; fill=&quot;var(--ink, #171614)&quot;/&gt;
+&lt;text x=&quot;613.0&quot; y=&quot;318.0&quot; font-size=&quot;12&quot; font-weight=&quot;600&quot; fill=&quot;var(--ink, #171614)&quot;&gt;set, hit&lt;/text&gt;
+&lt;text x=&quot;333&quot; y=&quot;394&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--ink-muted, #57534d)&quot;&gt;elements in the container&lt;/text&gt;
+&lt;text transform=&quot;translate(14,186) rotate(-90)&quot; text-anchor=&quot;middle&quot; font-size=&quot;12&quot; fill=&quot;var(--ink-muted, #57534d)&quot;&gt;time per membership test&lt;/text&gt;
+&lt;/svg&gt;&lt;figcaption&gt;Both axes are logarithmic. The scan is a straight rising line because its cost is proportional to the elements it compares; the hash lookup is flat because it compares one. The lines cross at the very left edge of the chart, not in the middle of it.&lt;/figcaption&gt;&lt;/figure&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Elements&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;list, miss&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;set, miss&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;list, hit&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;set, hit&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;list vs set, miss&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;1&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;40 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;31 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;38 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;47 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.30x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;2&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;54 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;33 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;54 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;47 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.62x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;3&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;68 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;33 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;54 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;47 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.04x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;4&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;84 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;36 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;68 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;48 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.32x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;6&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;113 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;30 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;83 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;47 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;3.78x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;8&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;142 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;30 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;98 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;47 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;4.68x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;12&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;213 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;38 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;127 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;47 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;5.58x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;16&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;273 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;38 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;157 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;48 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;7.14x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;24&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;388 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;30 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;225 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;47 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;13x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;32&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;508 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;30 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;284 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;48 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;17x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;48&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;740 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;30 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;405 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;48 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;25x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;64&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;988 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;30 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;520 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;48 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;32x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;128&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1,937 ns †&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;34 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1,003 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;46 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;56x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;256&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;3,902 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;35 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1,964 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;46 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;112x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;1,024&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;16.9 µs&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;35 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;7,963 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;47 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;482x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;10,000&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;151.2 µs&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;34 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;79.9 µs&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;47 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;4,461x&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;† Three of the 135 measurements in this run did not converge to the standard
+this blog publishes at, and they are marked with a dagger wherever they appear
+rather than quietly dropped. Nothing below rests on any of them; the method
+section explains the standard and why they failed it.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;There is no small-&lt;code&gt;n&lt;/code&gt; region where the list wins a miss.&lt;/strong&gt; Not at ten, not at
+four, not at one: a single-element list costs 40 ns to fail a membership test
+and a single-element set costs 31 ns. For a hit the list wins exactly one size —
+&lt;code&gt;n=1&lt;/code&gt;, 38.5 ns against 47.3 ns — and loses from two elements up.&lt;/p&gt;
+&lt;p&gt;Fitting the scan as &lt;code&gt;fixed + slope × elements compared&lt;/code&gt; gives &lt;strong&gt;15.0 ns per
+element&lt;/strong&gt; with a &lt;strong&gt;25.2 ns&lt;/strong&gt; fixed cost for a miss, and 16.0 ns with 30.4 ns for
+a hit. That model, fitted from the smallest and the two largest sizes only,
+predicts every one of the sixteen measured points to within 9.2% on the miss
+curve and 13% on the hit curve. Setting it equal to the flat hash cost puts the
+crossover at &lt;strong&gt;0.5 elements&lt;/strong&gt; for a miss and &lt;strong&gt;1.0&lt;/strong&gt; for a hit.&lt;/p&gt;
+&lt;p&gt;A crossover below one element is a strange thing to report, so state it the
+plain way: the hash lookup&amp;#39;s fixed cost is &lt;em&gt;already lower&lt;/em&gt; than the scan&amp;#39;s fixed
+cost, and every element after that is pure loss.&lt;/p&gt;
+&lt;p&gt;The dict behaves like the set throughout — 30.2 to 40.1 ns on a miss, 48.6 to
+50.7 ns on a hit — so nothing below distinguishes them, and everything said
+about &lt;code&gt;in set&lt;/code&gt; applies to &lt;code&gt;in dict&lt;/code&gt;.&lt;/p&gt;
+&lt;h2 id=&quot;two-things-that-fall-out-of-the-table&quot;&gt;Two things that fall out of the table&lt;a class=&quot;anchor&quot; href=&quot;#two-things-that-fall-out-of-the-table&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;The set is &lt;strong&gt;more expensive on a hit than on a miss&lt;/strong&gt; (47 ns against 33 ns), which
+is backwards from most people&amp;#39;s mental model. It is the right way round for open
+addressing: a miss usually lands on an empty slot and returns immediately,
+having compared nothing, while a hit has to actually compare the key it found.
+That comparison is the extra 14 ns.&lt;/p&gt;
+&lt;p&gt;And the list costs about the same on a hit and a miss at &lt;code&gt;n=1&lt;/code&gt; — 38.5 ns
+against 40.2 ns — as it must, since one element means one comparison either way. That
+agreement is not a finding; it is a check that the two halves of the sweep were
+measuring the same thing.&lt;/p&gt;
+&lt;h2 id=&quot;so-why-does-everyone-believe-in-the-small-n-exception&quot;&gt;So why does everyone believe in the small-&lt;code&gt;n&lt;/code&gt; exception?&lt;a class=&quot;anchor&quot; href=&quot;#so-why-does-everyone-believe-in-the-small-n-exception&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;The obvious explanation is the identity shortcut. &lt;code&gt;list.__contains__&lt;/code&gt; goes
+through &lt;code&gt;PyObject_RichCompareBool&lt;/code&gt;, which returns true on a pointer match before
+attempting a value comparison — and in CPython small integers are shared
+singletons, short strings are interned, and keys are often the same objects that
+went into the container. If the folklore were measuring identity comparisons
+rather than value comparisons, that would explain it.&lt;/p&gt;
+&lt;p&gt;It is not the explanation. Same list, same position, three different probes:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Probe at index 4 of an 8-element list&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Time&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;A different object with an equal value&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;98.8 ns&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;The element itself (identity match)&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;85.0 ns&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;Small ints, &lt;code&gt;4 in list(range(8))&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;85.8 ns&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;Fourteen nanoseconds. The shortcut fires once — on the one element that matches —
+and the four elements before it are compared by value regardless. It buys about
+one comparison&amp;#39;s worth of the ~16 ns per element, which is a neat confirmation
+that most of that per-element cost really is the comparison, and no help at all
+to the list.&lt;/p&gt;
+&lt;p&gt;The actual reason the belief survives is duller, and it is worth being honest
+about: at eight elements the set saves &lt;strong&gt;112 nanoseconds&lt;/strong&gt;. Nobody has ever
+noticed 112 nanoseconds. The list is not fast — it is &lt;em&gt;irrelevant&lt;/em&gt;, which feels
+identical from the outside until the container grows and it stops being either.&lt;/p&gt;
+&lt;h2 id=&quot;every-key-type-makes-it-worse&quot;&gt;Every key type makes it worse&lt;a class=&quot;anchor&quot; href=&quot;#every-key-type-makes-it-worse&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;The crossover above uses integers, which is the case most favourable to the
+list. Hitting the midpoint of a 64-element container:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Key type&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;&lt;code&gt;in list&lt;/code&gt;&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;&lt;code&gt;in set&lt;/code&gt;&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;int&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;577 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;48 ns&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;str&lt;/code&gt; (11 chars)&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;862 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;42 ns&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;tuple[int, int]&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1,120 ns †&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;61 ns&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;The scan gets 1.5x worse on strings and 1.9x worse on tuples, because comparing
+those is more work than comparing two machine words. The hash lookup barely
+moves — and on strings it gets &lt;em&gt;faster&lt;/em&gt; than on integers, because &lt;code&gt;str&lt;/code&gt; caches
+its hash on the object, so a repeated lookup of the same key skips hashing
+entirely.&lt;/p&gt;
+&lt;p&gt;Tuples are the one case where the hash side pays something real: &lt;code&gt;tuple&lt;/code&gt; does
+&lt;strong&gt;not&lt;/strong&gt; cache its hash, so every lookup rehashes the whole tuple, and the set
+lookup goes from 48 ns to 61 ns. Even so, the scan degrades three times faster
+than the lookup does. There is no key type that rescues the list.&lt;/p&gt;
+&lt;p&gt;(A tuple &lt;em&gt;container&lt;/em&gt; scans marginally faster than a list — 248.9 ns against
+268.9 ns at 16 elements, about 7%. Real, reproducible, and far too small to
+change any decision.)&lt;/p&gt;
+&lt;h2 id=&quot;where-the-decision-actually-lives&quot;&gt;Where the decision actually lives&lt;a class=&quot;anchor&quot; href=&quot;#where-the-decision-actually-lives&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;If the size crossover is at one element, then size is not the interesting
+variable. Construction is. Building a set is work the list never does, and the
+asymptotic argument ignores it completely:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Elements&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Build the set&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Saved per miss&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Lookups to break even&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;4&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;226 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;48 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;4.7&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;16&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;514 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;235 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;2.2&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;64&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1,614 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;958 ns&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;1.7&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;1,024&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;24.4 µs †&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;16.9 µs&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;1.4&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;Two lookups. Building a set from a 16-element list costs about as much as two
+membership tests against that list, and everything after the second is profit.
+At 1,024 elements it has repaid itself before the second lookup finishes.&lt;/p&gt;
+&lt;p&gt;This is the rule that replaces the size rule: &lt;strong&gt;the question is not how many
+elements you have, it is how many times you look.&lt;/strong&gt; Once is a wash. Twice is
+already worth it. And a set that is built once at import and read forever — the
+overwhelmingly common shape — is free.&lt;/p&gt;
+&lt;p&gt;The corollary is the failure mode. A set built &lt;em&gt;inside&lt;/em&gt; the loop that queries it
+is strictly worse than the list, at every size, and no amount of &amp;quot;but sets are
+O(1)&amp;quot; saves it:&lt;/p&gt;
+&lt;figure class=&quot;code&quot;&gt;&lt;span class=&quot;code-lang&quot;&gt;python&lt;/span&gt;&lt;pre&gt;&lt;code class=&quot;language-python&quot;&gt;for record in records:                    # build cost paid per record
+    if record.id in set(allowed_ids):     # never repays: one lookup each
+        ...&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;h2 id=&quot;the-literal-trap&quot;&gt;The literal trap&lt;a class=&quot;anchor&quot; href=&quot;#the-literal-trap&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Which brings up the one place where the advice reverses, and it is the form most
+people actually write:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Expression&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Time&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;x in [1000000, 1000007, ...]&lt;/code&gt; (5 constants)&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;89.9 ns&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;x in (1000000, 1000007, ...)&lt;/code&gt; (5 constants)&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;89.0 ns&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;x in {1000000, 1000007, ...}&lt;/code&gt; (5 constants)&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;27.4 ns&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;x in [a, b, c, d, e]&lt;/code&gt; (5 variables)&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;150.1 ns&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;x in {a, b, c, d, e}&lt;/code&gt; (5 variables)&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;&lt;strong&gt;277.0 ns&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;The same syntax, twice, with opposite answers. With &lt;strong&gt;constant&lt;/strong&gt; members the set
+literal is 3.3x faster than the list; with &lt;strong&gt;variable&lt;/strong&gt; members it is 1.8x
+&lt;em&gt;slower&lt;/em&gt;. The bytecode says why:&lt;/p&gt;
+&lt;figure class=&quot;code&quot;&gt;&lt;pre&gt;&lt;code&gt;x in [1, 3, 5, 7, 9]   -&amp;gt;  LOAD_NAME  LOAD_CONST  CONTAINS_OP
+x in {1, 3, 5, 7, 9}   -&amp;gt;  LOAD_NAME  LOAD_CONST  CONTAINS_OP
+x in {a, b, c, d, e}   -&amp;gt;  LOAD_NAME  LOAD_NAME x5  BUILD_SET  CONTAINS_OP&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;When every member is a constant the compiler folds the whole container into the
+code object: the list becomes a tuple constant, the set becomes a &lt;strong&gt;frozenset&lt;/strong&gt;
+constant. Neither is built at runtime, so the frozenset gets its O(1) lookup for
+nothing. When the members are variables nothing can be folded, and
+&lt;code&gt;BUILD_SET&lt;/code&gt; runs on every evaluation — hashing five values to answer one
+question. That is the loop mistake above, spelled with braces instead of a
+function call.&lt;/p&gt;
+&lt;p&gt;(And the line the disassembly above leaves out: &lt;code&gt;x in [a, b, c]&lt;/code&gt; emits
+&lt;code&gt;BUILD_TUPLE&lt;/code&gt;, not &lt;code&gt;BUILD_LIST&lt;/code&gt;. The compiler will not build a list for a
+membership test even when you write one.)&lt;/p&gt;
+&lt;h2 id=&quot;what-it-costs-in-memory&quot;&gt;What it costs in memory&lt;a class=&quot;anchor&quot; href=&quot;#what-it-costs-in-memory&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;The one axis where the list wins, and it is not close:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;10,000 integers&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;Bytes&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;vs. list&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;list&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;85,176&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;1.0x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;dict&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;294,992&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;3.5x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;set&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;524,504&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;6.2x&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;A hash table has to stay sparse to stay fast, and you pay for the empty slots.
+The set keeps a sparser table than the dict at this size, which is why the
+&lt;code&gt;dict.fromkeys()&lt;/code&gt; version is smaller than the &lt;code&gt;set()&lt;/code&gt; version despite doing
+more. If you have a great many of these containers, that 6.2x is the real
+argument for the list — not speed.&lt;/p&gt;
+&lt;h2 id=&quot;what-to-do-with-this&quot;&gt;What to do with this&lt;a class=&quot;anchor&quot; href=&quot;#what-to-do-with-this&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Default to a set for membership, at every size.&lt;/strong&gt; There is no small-&lt;code&gt;n&lt;/code&gt; exception to find. The break-even is one element, and writing &lt;code&gt;{...}&lt;/code&gt; instead of &lt;code&gt;[...]&lt;/code&gt; costs nothing at the time you write it.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Build it once.&lt;/strong&gt; This is the only part that needs thought. Hoist the set out of the loop, make it a module-level constant, build it beside the list rather than inside the query. Two lookups repay construction at sixteen elements and above; at four elements it takes about five, which is still not many.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Write &lt;code&gt;x in {1, 2, 3}&lt;/code&gt;, never &lt;code&gt;x in (1, 2, 3)&lt;/code&gt;.&lt;/strong&gt; For constant members the compiler hands you a frozenset for free — 3.3x here, with no build cost and no downside at all.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;But write &lt;code&gt;x in (a, b, c)&lt;/code&gt; when the members are variables.&lt;/strong&gt; The set literal builds a real set on every evaluation and was 1.8x slower than the sequence form. Braces are only free when the compiler can fold them.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Don&amp;#39;t refactor existing small containers for this.&lt;/strong&gt; At eight elements it is 112 ns. Unless it is inside a hot loop, that is not a change worth making, and the diff costs more attention than the nanoseconds are worth. This is advice about what to write next, not what to go and fix.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Keep the list when you need order, duplicates, unhashable elements, or the memory&lt;/strong&gt; — 6.2x at ten thousand integers. Those are good reasons. &amp;quot;It&amp;#39;s faster for small &lt;code&gt;n&lt;/code&gt;&amp;quot; is not one of them.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;The thing worth carrying away is that the two sides of this argument were both
+answering the wrong question. Neither the O(1) nor the O(n) tells you anything
+useful at the sizes real code uses, because at those sizes both are fast enough
+to be invisible. What actually decides it is a ratio the asymptotics don&amp;#39;t
+mention at all: lookups per construction. Above a handful, use a set. At one, it
+never mattered.&lt;/p&gt;
+&lt;aside class=&quot;callout callout-note&quot;&gt;&lt;p class=&quot;callout-label&quot;&gt;NOTE&lt;/p&gt;&lt;p&gt;Three limits worth naming. &lt;strong&gt;These are CPython 3.13 numbers on one M1 laptop&lt;/strong&gt;;
+PyPy&amp;#39;s JIT can eliminate a short scan entirely and would move the crossover,
+possibly a long way. &lt;strong&gt;Every probe here is equal but not identical to what it
+matches&lt;/strong&gt; — deliberately, because keys read from a file or a socket are, but
+code that checks membership using the very objects it built the container from
+gets the identity shortcut a little more often than these numbers show, and
+the difference was 14 ns. &lt;strong&gt;And nothing here is measured cold&lt;/strong&gt;: the containers
+are live in cache. A ten-thousand element list scanned from cold memory would
+be worse than reported, not better, which does not change any conclusion.&lt;/p&gt;&lt;/aside&gt;
+&lt;h2 id=&quot;method&quot;&gt;Method&lt;a class=&quot;anchor&quot; href=&quot;#method&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;Every measurement is a statement inlined into a timing loop, with the empty loop
+measured under identical conditions and subtracted. The minimum across trials is
+reported: timing noise on a general-purpose OS is additive, so the fastest
+observed run is the best estimate of true cost.&lt;/p&gt;
+&lt;p&gt;This run needed more care than the previous ones, and the reason is worth
+publishing rather than hiding. &lt;strong&gt;The machine was busy&lt;/strong&gt; — the load average on
+eight cores went from 2.6 at the start of the run to 36.6 by the end, both
+figures recorded in &lt;code&gt;results.json&lt;/code&gt;, because the process writing this post was
+running on the same laptop. At that load the median of a 30 ns measurement is
+polluted while its minimum is not, so the usual &amp;quot;report the spread&amp;quot; check stops
+measuring the benchmark and starts measuring the laptop: spreads here reach 290%
+on measurements whose minima are reproducible to a nanosecond. A first, discarded
+version of this experiment — sampled the conventional way, nine long trials —
+put the same set lookup anywhere between 12 ns and 68 ns depending on which run
+you asked. Those runs are not in the committed data; they are why the harness
+changed.&lt;/p&gt;
+&lt;p&gt;The harness now does three things about it. It &lt;strong&gt;samples by scale&lt;/strong&gt;: an
+operation under a microsecond gets 401 short windows rather than 9 long ones,
+because it only takes one clean window to see the floor and a long window is
+more likely to catch a preemption. It &lt;strong&gt;measures whether the minimum converged&lt;/strong&gt;,
+by splitting the samples into interleaved halves and comparing the two minima —
+if independent halves of a run agree on the floor, the floor is real, however
+noisy the median. And it &lt;strong&gt;re-samples anything that fails that check&lt;/strong&gt; at three
+times the trial count. Of the 135 measurements here, 14 needed re-sampling and
+&lt;strong&gt;three still did not converge&lt;/strong&gt;: &lt;code&gt;list n=128 miss&lt;/code&gt;, &lt;code&gt;list tuple n=64 hit&lt;/code&gt; and
+&lt;code&gt;build set n=1024&lt;/code&gt;, all during the load spike at the end of the run. They carry a
+dagger in the tables above, and nothing in this post depends on them — the shape
+of the sweep is carried by the other fifteen sizes, the tuple-key point by the
+8-element measurement, and the break-even argument by the 16- and 64-element
+rows. Publishing them marked is more useful than deleting them, and both are
+better than quoting them as though they were solid. The per-measurement stability
+figures are in
+&lt;a href=&quot;https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/dict-vs-list-crossover/results.json&quot; rel=&quot;noopener&quot; target=&quot;_blank&quot;&gt;&lt;code&gt;results.json&lt;/code&gt;&lt;/a&gt;
+alongside the medians and the load average.&lt;/p&gt;
+&lt;p&gt;Two independent checks that this is not an artefact of the harness. Every number
+on this blog comes from one piece of timing code, which makes a systematic error
+in that code invisible from the inside, so the per-element scan cost was
+reproduced with &lt;strong&gt;stdlib &lt;code&gt;timeit&lt;/code&gt;&lt;/strong&gt; — a different implementation, run with the
+same many-short-windows methodology. It gives &lt;strong&gt;15.73 ns per element against the
+harness&amp;#39;s 14.96, a disagreement of 5.1%&lt;/strong&gt; — larger than one would like, and the
+honest reading is that the per-element cost is 15 ns give or take a nanosecond
+rather than any of the decimal places above. The same 5.1% gap turned up on an
+earlier pair of runs, which points at a small systematic difference in how the
+two subtract loop overhead rather than at noise. That check is
+&lt;a href=&quot;https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/dict-vs-list-crossover/run.py&quot; rel=&quot;noopener&quot; target=&quot;_blank&quot;&gt;&lt;code&gt;run.py --crosscheck&lt;/code&gt;&lt;/a&gt;
+and its output is committed in &lt;code&gt;crosscheck.json&lt;/code&gt;. Second, the two-point model of
+the scan, fitted using only the smallest and the two largest of sixteen sizes,
+predicts the thirteen sizes it was not fitted on to within 13% — which a
+mismeasured curve would not do.&lt;/p&gt;
+&lt;p&gt;Garbage collection is disabled during measurement. The chart and the tables are
+both generated from the same &lt;code&gt;results.json&lt;/code&gt;, so they cannot disagree. The script
+is
+&lt;a href=&quot;https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/dict-vs-list-crossover/run.py&quot; rel=&quot;noopener&quot; target=&quot;_blank&quot;&gt;&lt;code&gt;run.py&lt;/code&gt;&lt;/a&gt;;
+the harness has
+&lt;a href=&quot;https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/selftest.py&quot; rel=&quot;noopener&quot; target=&quot;_blank&quot;&gt;its own test suite&lt;/a&gt;,
+which passes on the machine that produced these numbers.&lt;/p&gt;</content>
+  </entry>
   <entry>
     <title>What a Python function call actually costs</title>
     <link href="https://mehtaz247.github.io/p/python-call-overhead/"/>
@@ -182,6 +568,15 @@ timer resolution well below the noise. Each statement runs nine trials, and the
 fastest observed run is the closest estimate of the true cost. The median and
 the spread are recorded in the raw JSON, and no figure here came from a run with
 a spread above 15%.&lt;/p&gt;
+&lt;p&gt;That paragraph describes the harness as it stood when these numbers were taken.
+On 2026-08-31 it was rewritten — many short trials instead of a few long ones,
+and a convergence check on the minimum instead of a threshold on the spread —
+because the old scheme was not reliable below a microsecond on a busy machine.
+The reasoning is in
+&lt;a href=&quot;/p/dict-vs-list-crossover/&quot;&gt;At what size does a dict beat a list?&lt;/a&gt;. Re-running
+this experiment today therefore samples differently from the run above; the
+figures here have not yet been re-measured under the new scheme, and this note
+will be replaced by the new numbers when they have.&lt;/p&gt;
 &lt;p&gt;Garbage collection is disabled during measurement. That is a real distortion —
 GC is not free in production — but allocation rates inside a microbenchmark
 loop bear no relation to a real workload, so leaving it on measures the harness

@@ -6,7 +6,8 @@
 // Supported: ATX headings, paragraphs, fenced code, nested lists,
 // blockquotes/callouts, tables, thematic breaks, footnotes, images, links,
 // bold/italic/strikethrough, inline code, autolinks, and raw HTML blocks
-// fenced by <!--html--> ... <!--/html-->.
+// fenced by <!--html--> ... <!--/html-->, and generated figures included by
+// !figure[Caption](path) when the caller supplies an `include` resolver.
 
 const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ESCAPES[c]);
@@ -137,6 +138,29 @@ function parseBlocks(lines, ctx) {
     const line = lines[i];
     if (!line.trim()) { i++; continue; }
 
+    // Figure include: !figure[Caption](assets/charts/thing.svg)
+    //
+    // The file is inlined rather than referenced through <img>, so that an SVG
+    // drawn in var(--ink) and var(--accent) follows the site's light/dark
+    // toggle instead of being a picture of whichever theme generated it.
+    //
+    // A missing file throws. Charts are generated from results.json by the
+    // experiment that produced the numbers, so a missing one means the figure
+    // and the prose have come apart -- exactly the failure that must stop a
+    // deploy rather than ship a post with a hole in it.
+    const fig = line.match(/^!figure\[([^\]]*)\]\(([^)\s]+)\)\s*$/);
+    if (fig) {
+      if (typeof ctx.include !== 'function') {
+        throw new Error('!figure used but no include resolver was supplied: ' + fig[2]);
+      }
+      const svg = ctx.include(fig[2]);
+      const caption = fig[1].trim();
+      out.push('<figure class="chart">' + svg +
+        (caption ? '<figcaption>' + inline(caption, ctx) + '</figcaption>' : '') + '</figure>');
+      i++;
+      continue;
+    }
+
     // Escape hatch for hand-written HTML (inline charts, custom figures).
     if (line.trim() === '<!--html-->') {
       const buf = [];
@@ -235,6 +259,7 @@ function parseBlocks(lines, ctx) {
            !/^\s*(?:#{1,6}\s|>|```|~~~|\|)/.test(lines[i]) &&
            !/^\s*(?:[-*+]|\d+[.)])\s+/.test(lines[i]) &&
            !/^\[\^[^\]]+\]:/.test(lines[i]) &&
+           !/^!figure\[[^\]]*\]\([^)\s]+\)\s*$/.test(lines[i]) &&
            lines[i].trim() !== '<!--html-->') {
       buf.push(lines[i++]);
     }
@@ -245,7 +270,7 @@ function parseBlocks(lines, ctx) {
 }
 
 export function renderMarkdown(src, opts = {}) {
-  const ctx = { toc: [], footnotes: {}, footnoteOrder: [], host: opts.host };
+  const ctx = { toc: [], footnotes: {}, footnoteOrder: [], host: opts.host, include: opts.include };
   // Definitions may appear after their references, so render the body first,
   // then append notes in reference order.
   let html = parseBlocks(String(src).replace(/\r\n?/g, '\n').split('\n'), ctx);

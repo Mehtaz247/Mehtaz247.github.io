@@ -203,6 +203,16 @@ fastest observed run is the closest estimate of the true cost. The median and
 the spread are recorded in the raw JSON, and no figure here came from a run with
 a spread above 15%.
 
+That paragraph describes the harness as it stood when these numbers were taken.
+On 2026-08-31 it was rewritten — many short trials instead of a few long ones,
+and a convergence check on the minimum instead of a threshold on the spread —
+because the old scheme was not reliable below a microsecond on a busy machine.
+The reasoning is in
+[At what size does a dict beat a list?](/p/dict-vs-list-crossover/). Re-running
+this experiment today therefore samples differently from the run above; the
+figures here have not yet been re-measured under the new scheme, and this note
+will be replaced by the new numbers when they have.
+
 Garbage collection is disabled during measurement. That is a real distortion —
 GC is not free in production — but allocation rates inside a microbenchmark
 loop bear no relation to a real workload, so leaving it on measures the harness
