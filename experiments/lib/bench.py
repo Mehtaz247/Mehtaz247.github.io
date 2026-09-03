@@ -37,6 +37,15 @@ The methodology is the product here, so it is written down:
   floor, the floor is real. That is the number to gate a published claim on.
   ``spread_pct`` is retained and reports machine noise.
 
+* **The speed of the machine itself is measured, not assumed.** Convergence
+  is a claim about *precision*: it says independent halves of a run agree on
+  the floor. It says nothing about *accuracy*. A thread pinned to an
+  efficiency core runs every window uniformly slowly, so the two halves agree
+  perfectly on a floor that is three times too high. Each suite therefore
+  times a fixed reference kernel and reports what fraction of this machine's
+  best-ever observed speed it is getting. See ``reference.json`` for the
+  measurements that forced this.
+
 * **Everything is recorded**, including the load average during the run, so a
   published number can always be traced back to the conditions that produced
   it.
@@ -339,6 +348,75 @@ def bench(
 
 
 # ---------------------------------------------------------------------------
+# Machine speed reference
+# ---------------------------------------------------------------------------
+
+# The convergence check above answers "did this measurement settle?". It cannot
+# answer "was the machine running at full speed while it settled?", and on
+# 2026-09-03 that gap published itself: an entire suite came back 2.1-3.6x
+# slower than the same suite eleven days earlier, with all 32 measurements
+# converging and none flagged. Benchmarks here run at QOS_CLASS_BACKGROUND,
+# which on Apple silicon means the efficiency cores, and their delivered
+# throughput depends on what else the machine is doing.
+#
+# The fix is an external yardstick: one fixed kernel, timed every run, compared
+# against the fastest this machine has ever been seen to run it.
+
+REFERENCE_NAME = "reference: zero-argument function call"
+REFERENCE_STMT = "plain()"
+REFERENCE_SETUP = "def plain():\n    return 1\n"
+REFERENCE_PATH = Path(__file__).resolve().parent / "reference.json"
+
+
+def reference_record() -> dict[str, Any]:
+    return json.loads(REFERENCE_PATH.read_text())
+
+
+def calibrate(update: bool = True) -> dict[str, Any]:
+    """Time the reference kernel and report this machine's current speed.
+
+    Returns the observed cost, the best ever recorded, and the ratio between
+    them. A ratio of 1.0 means the machine is running as fast as it has ever
+    been seen to run; 0.35 means a number measured now will read roughly three
+    times its true cost.
+
+    If this run is faster than the record *and* the measurement converged, the
+    record is updated -- the yardstick can only ever get more demanding, and
+    every change is auditable in git. A measurement that did not converge is
+    never allowed to set a record, because a glitch low would permanently
+    poison the reference.
+    """
+    r = bench(REFERENCE_NAME, REFERENCE_STMT, setup=REFERENCE_SETUP)
+    rec = reference_record()
+    best = float(rec["best_ns"])
+    observed = r.ns_per_op
+    ratio = (best / observed) if observed > 0 else 0.0
+
+    if update and r.trustworthy and 0 < observed < best:
+        rec["history"].append({
+            "ns": round(observed, 2),
+            "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "load": _loadavg(),
+            "note": f"new record, previous {best:.2f} ns",
+        })
+        rec["best_ns"] = round(observed, 2)
+        rec["observed_at"] = rec["history"][-1]["at"]
+        rec["source"] = "set by calibrate() during a suite run"
+        REFERENCE_PATH.write_text(json.dumps(rec, indent=2) + "\n")
+        best, ratio = observed, 1.0
+
+    return {
+        "kernel": rec["kernel"],
+        "observed_ns": round(observed, 2),
+        "best_ns": round(best, 2),
+        "speed_ratio": round(ratio, 3),
+        "converged": r.trustworthy,
+        "stability_pct": round(r.stability_pct, 2),
+        "throttle_floor": float(rec["throttle_floor"]),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Suite
 # ---------------------------------------------------------------------------
 
@@ -354,6 +432,13 @@ class Suite:
         self.facts: dict[str, Any] = {}
         self.started_at = time.time()
         self.load_at_start = _loadavg()
+        # Timed before any measurement and again in save(), so a suite that
+        # started fast and ended slow is visible rather than averaged away.
+        self.speed_at_start = calibrate()
+        self.speed_at_end: dict[str, Any] | None = None
+        print(f"machine speed: {self.speed_at_start['speed_ratio']:.2f}x of best "
+              f"({self.speed_at_start['observed_ns']:.2f} ns against a "
+              f"{self.speed_at_start['best_ns']:.2f} ns record)", flush=True)
 
     def run(self, name: str, stmt: str, **kw: Any) -> Result:
         kw.setdefault("setup", self.setup)
@@ -384,6 +469,16 @@ class Suite:
     def save(self, path: str | Path | None = None) -> Path:
         out = Path(path) if path else Path(__file__).resolve().parents[1] / self.slug / "results.json"
         out.parent.mkdir(parents=True, exist_ok=True)
+
+        # Gate on the *worse* of the two calibrations. Taking the better one
+        # would certify a suite that ran fast for five seconds and slowly for
+        # the next forty minutes, which is precisely the failure this check
+        # exists to catch.
+        self.speed_at_end = calibrate()
+        speed = min(self.speed_at_start["speed_ratio"], self.speed_at_end["speed_ratio"])
+        floor = self.speed_at_start["throttle_floor"]
+        throttled = speed < floor
+
         payload = {
             "slug": self.slug,
             "question": self.question,
@@ -392,12 +487,33 @@ class Suite:
             "noise_floor_ns": NOISE_FLOOR_NS,
             "load_average_at_start": self.load_at_start,
             "load_average_at_end": _loadavg(),
+            "machine_speed": {
+                "ratio": round(speed, 3),
+                "throttled": throttled,
+                "floor": floor,
+                "at_start": self.speed_at_start,
+                "at_end": self.speed_at_end,
+                "what_this_means": (
+                    "Fraction of this machine's best-ever observed speed on a fixed "
+                    "reference kernel. Absolute figures from a run below the floor "
+                    "read high by roughly 1/ratio and must not be published as costs."
+                ),
+            },
             "unstable_results": [r.name for r in self.results if not r.trustworthy],
             "facts": self.facts,
             "results": [asdict(r) for r in self.results],
         }
         out.write_text(json.dumps(payload, indent=2) + "\n")
         print(f"\nwrote {out}", flush=True)
+        if throttled:
+            print(f"\n!! MACHINE THROTTLED: this run got {speed:.2f}x of the best speed "
+                  f"ever recorded (floor {floor}).\n"
+                  f"   Every absolute figure here reads roughly {1 / speed:.1f}x high. "
+                  f"Ratios within the run are also distorted:\n"
+                  f"   the 2026-09-03 comparison found per-measurement inflation "
+                  f"ranging from 2.1x to 3.6x, so it does not divide out.\n"
+                  f"   Do not publish costs from this run. Re-measure when the machine "
+                  f"is quiet.", flush=True)
         bad = payload["unstable_results"]
         if bad:
             print(f"\n!! {len(bad)} of {len(self.results)} measurements did not converge "

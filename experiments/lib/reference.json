@@ -1,0 +1,17 @@
+{
+  "note": "How fast this machine runs when nothing is in its way.\n\nThe convergence check in bench.py measures *precision* -- whether independent halves of a run agree on the floor. It cannot measure *accuracy*. On 2026-09-03 the whole python-call-overhead suite was re-run and came back 2.1-3.6x slower than the 2026-08-29 run, with every one of 32 measurements passing the convergence check and none flagged unstable. Three independent timing implementations (the August harness, the current harness, and stdlib timeit) agreed with each other that day and all disagreed with August by ~3x, so the cause is the machine, not the code: benchmarks here run at QOS_CLASS_BACKGROUND, which on Apple silicon parks the thread on the efficiency cores, and how much throughput that yields depends on what else is running.\n\nSo every run now measures a fixed reference kernel and reports what fraction of this machine's best-ever observed speed it is getting. A run well below peak is still precise and still reproducible; it is simply not measuring the same computer.",
+  "kernel": "zero-argument Python function call, measured by bench() at its default sub-microsecond plan",
+  "best_ns": 13.37,
+  "observed_at": "2026-08-29T13:37:10Z",
+  "source": "experiments/python-call-overhead/results.json, the 2026-08-29 run of 'plain function, no args'",
+  "seeded_caveat": "Seeded from a run taken with the August harness, which sampled 9 trials against 4 baseline trials. On a loaded machine that scheme reads high, not low (48.9 ns against the current harness's 36.2 ns on 2026-09-03), so 13.37 ns is if anything an over-estimate of the true peak and the resulting ratio errs toward refusing runs rather than certifying them.",
+  "throttle_floor": 0.75,
+  "history": [
+    {
+      "ns": 13.37,
+      "at": "2026-08-29T13:37:10Z",
+      "load": null,
+      "note": "seed; machine state not recorded, load average was not captured before 2026-08-31"
+    }
+  ]
+}

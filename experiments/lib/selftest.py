@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from bench import bench, Result, NOISE_FLOOR_NS, _loadavg  # noqa: E402
+from bench import (bench, calibrate, reference_record, Result,  # noqa: E402
+                   NOISE_FLOOR_NS, REFERENCE_PATH, _loadavg)
 
 failures: list[str] = []
 passed = 0
@@ -125,6 +126,41 @@ check("p10 lies between the minimum and the median",
       fast.ns_per_op <= fast.p10_ns <= max(fast.median_ns, fast.ns_per_op),
       f"min={fast.ns_per_op:.2f} p10={fast.p10_ns:.2f} median={fast.median_ns:.2f}")
 
+# --- 11. The machine-speed reference ----------------------------------------
+# Convergence says a measurement settled; it does not say the machine was
+# running at full speed while it settled. On 2026-09-03 an entire suite came
+# back 2.1-3.6x slow with every measurement converging, which is what this
+# reference exists to catch. These checks are about the mechanism, not about
+# any particular speed -- the machine is allowed to be slow while the tests run.
+rec = reference_record()
+check("the speed reference record is present and well formed",
+      isinstance(rec.get("best_ns"), (int, float)) and rec["best_ns"] > 0
+      and 0 < float(rec["throttle_floor"]) <= 1.0,
+      f"best={rec.get('best_ns')} floor={rec.get('throttle_floor')}")
+
+before = REFERENCE_PATH.read_text()
+speed = calibrate(update=False)
+check("calibration reports a positive speed ratio against the record",
+      speed["speed_ratio"] > 0 and speed["observed_ns"] > 0,
+      f"ratio={speed['speed_ratio']} observed={speed['observed_ns']:.2f} ns")
+check("calibrate(update=False) never rewrites the record",
+      REFERENCE_PATH.read_text() == before)
+
+# The gate itself, tested against known inputs rather than a live machine: a
+# run at a third of peak must be refused, and a run at full speed accepted.
+floor = float(rec["throttle_floor"])
+check("a run at a third of the record's speed is refused", (1 / 3) < floor,
+      f"floor={floor}")
+check("a run at the record's speed is accepted", 1.0 >= floor)
+
+# The record may only ever move downward (faster). A slower observation must
+# not be able to relax the yardstick.
+check("a slower observation cannot loosen the record",
+      speed["observed_ns"] >= rec["best_ns"] or speed["speed_ratio"] >= 1.0,
+      f"observed={speed['observed_ns']:.2f} record={rec['best_ns']:.2f}")
+
+print(f"\nmachine speed during this run: {speed['speed_ratio']:.2f}x of the "
+      f"{rec['best_ns']:.2f} ns record ({speed['observed_ns']:.2f} ns observed)")
 print(f"\nnoise floor: {NOISE_FLOOR_NS} ns")
 print(f"load average during this run: {_loadavg()}")
 

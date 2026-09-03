@@ -19,6 +19,22 @@ So here is the table. Every row was measured in the same process, on the same
 machine, in the same run, with the statement inlined directly into the timing
 loop so that nothing but the operation itself sits between the two clock reads.
 
+> [!NOTE]
+> **Correction, 2026-09-03.** This experiment was re-run five days after
+> publication and every one of its 32 measurements came back higher — a median
+> of 2.83x, ranging from 2.13x to 3.62x. The cause is not the code. It is that
+> the machine was running slowly, and neither the post nor the harness recorded
+> how fast the machine was at all.
+>
+> The table below is unchanged, because it is still the fastest this machine has
+> been observed to run: timing noise is additive, so the lowest observation is
+> the best estimate of true cost. But read these as **peak** figures for this
+> laptop, not typical ones. On a busy machine the same code measures roughly
+> three times slower, and the ratios between rows shift by up to 20%. The full
+> account is in [What went wrong with these numbers](#what-went-wrong-with-these-numbers)
+> below, and the slow run is committed alongside the original as
+> `results-2026-09-03-slow.json`.
+
 ## The numbers
 
 | Operation | ns/op | vs. a plain call |
@@ -196,22 +212,88 @@ call to every result, which is larger than most of the things on this list.
 
 An empty loop is timed under identical conditions and subtracted, so each figure
 is the marginal cost of the operation rather than the cost of the operation plus
-a `for`. Iteration counts are calibrated so a trial runs at least 50ms, putting
+a `for`. Iteration counts are calibrated so a trial runs at least 50 ms, putting
 timer resolution well below the noise. Each statement runs nine trials, and the
 **minimum** is reported: timing noise on a general-purpose OS is additive, so the
-fastest observed run is the closest estimate of the true cost. The median and
-the spread are recorded in the raw JSON, and no figure here came from a run with
-a spread above 15%.
+fastest observed run is the closest estimate of the true cost.
 
-That paragraph describes the harness as it stood when these numbers were taken.
-On 2026-08-31 it was rewritten — many short trials instead of a few long ones,
-and a convergence check on the minimum instead of a threshold on the spread —
-because the old scheme was not reliable below a microsecond on a busy machine.
-The reasoning is in
-[At what size does a dict beat a list?](/p/dict-vs-list-crossover/). Re-running
-this experiment today therefore samples differently from the run above; the
-figures here have not yet been re-measured under the new scheme, and this note
-will be replaced by the new numbers when they have.
+## What went wrong with these numbers
+
+The table above was measured on 2026-08-29. On 2026-09-03 the same script was
+run again, and every single measurement came back higher:
+
+| | 2026-08-29 | 2026-09-03 | factor |
+|---|--:|--:|--:|
+| integer addition | 2.29 | 5.62 | 2.45x |
+| plain function, no args | 13.4 | 36.2 | 2.71x |
+| `classmethod` | 44.0 | 134.0 | 3.05x |
+| decorator, `*args`/`**kwargs` | 51.9 | 166.6 | 3.21x |
+| three stacked decorators | 135.5 | 445.4 | 3.29x |
+| `functools.lru_cache` hit | 23.0 | 83.3 | 3.62x |
+
+All 32 measurements moved, with a median factor of 2.83x. **Not one of them was
+flagged as unreliable.** The harness checks whether a measurement converged — it
+splits the timing samples into interleaved halves and compares the two minima —
+and by that standard the September run was excellent, with every measurement
+agreeing with itself to within 6.5% and most within 2%.
+
+Three candidate explanations, and what each was worth:
+
+**It was not the harness.** The harness was rewritten between the two runs. So
+the August version was checked out of git and run again on 3 September: it
+reported 48.9 ns for a plain call, against the current harness's 36.2 ns the same
+afternoon. Both are near each other and both are nowhere near 13.4. For a third
+opinion outside this repository entirely, stdlib `timeit` was pointed at the same
+statement and returned 37.2 ns. Three independent implementations agreed with
+each other and disagreed with August.
+
+**It was not the interpreter.** The August run recorded CPython 3.13.0 and the
+September run 3.13.1 — a different binary, not just a different version string.
+Both were still installed, so `timeit` was run under each in turn on the same
+statement: 40.7 ns and 37.2 ns. Under 10% apart, not a threefold difference.
+
+**It was the machine.** Benchmarks here run under a scheduled background agent,
+and that process tree inherits `QOS_CLASS_BACKGROUND`. On Apple silicon, macOS
+schedules background-QoS threads onto the efficiency cores, and how much
+throughput those deliver depends on what else is running — on 3 September that
+was a browser with fifteen renderer processes, all at higher priority. Raising
+the thread's QoS from inside the process changes nothing; the clamp is at the
+task level.
+
+The measurement is not being *interrupted*, either, which is the failure mode the
+harness was already designed for. Timing the same loop with `thread_time` — which
+counts only the time the thread was actually on a CPU — gives 36.3 ns against
+36.2 ns of wall clock, 0.4% apart. Essentially nothing is lost to preemption. The
+cycles themselves are slower.
+
+### The lesson, which is the useful part
+
+**Convergence measures precision, not accuracy.** A benchmark pinned to a slow
+core runs every window uniformly slowly, so independent halves of the run agree
+beautifully on a floor that is three times too high. Every noise check in this
+harness — and every one in `timeit`, and most of the ones in your benchmark
+suite — is a check on how *consistent* the samples are. Consistency is exactly
+what a uniformly throttled machine delivers.
+
+If you take one thing from this post that is not a nanosecond count, take that
+one. A tight, reproducible, well-converged benchmark number can be off by 3x, and
+none of the statistics computed from the samples will tell you.
+
+The fix here is an external yardstick rather than a better statistic: one fixed
+reference kernel, timed at the start and end of every run, compared against the
+fastest this machine has ever been observed to run it. Every result file now
+carries a `machine_speed` block with that ratio, and a run below 0.75 of the
+record refuses to certify its own numbers. The September run scores 0.37.
+
+That check did not exist when this table was measured, so these figures have no
+accuracy warrant of their own — only the argument that additive noise makes the
+lowest observation the best estimate, and that nothing since has measured this
+machine faster. The reference record and the reasoning are in
+[`experiments/lib/reference.json`][ref]; the September run is committed next to
+the original as `results-2026-09-03-slow.json`, and all three cross-checks above
+are reproducible with `run.py --crosscheck`, which writes `crosscheck.json`.
+
+## Method, continued
 
 Garbage collection is disabled during measurement. That is a real distortion —
 GC is not free in production — but allocation rates inside a microbenchmark
@@ -225,3 +307,4 @@ does not leak into the measurement, and that two runs of the same statement
 agree. Those tests pass on the machine that produced this table.
 
 [selftest]: https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/selftest.py
+[ref]: https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/reference.json

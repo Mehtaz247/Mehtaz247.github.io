@@ -16,6 +16,10 @@ number from outside its own experiment, and a check that blocks the deploy for
 that would be trained away rather than fixed. Run it by hand before publishing
 and account for every line it prints.
 
+It also refuses a post whose results were measured while the machine was
+running well below its recorded speed, unless the post discloses that. See
+`experiments/lib/reference.json` for why that check exists.
+
 **Know what this does not catch.** It asks whether *some* value in the results
 rounds to each figure, not whether the *right* one does. A sentence saying
 "113 ns" where it should say "112 ns" passes silently if any other measurement
@@ -57,9 +61,37 @@ def main(post_path: str) -> int:
         print("post declares no experiment; nothing to check")
         return 0
 
-    data = json.loads((ROOT / "experiments" / slug.group(1) / "results.json").read_text())
-    measured = [r["ns_per_op"] for r in data["results"]]
-    facts = [v for v in data["facts"].values() if isinstance(v, (int, float))]
+    exp = ROOT / "experiments" / slug.group(1)
+    data = json.loads((exp / "results.json").read_text())
+
+    # A post that corrects itself quotes figures from more than one run of the
+    # same experiment -- "it read 13.4 ns in August and 36.2 ns in September" is
+    # the correction. Every committed run of the experiment is a legitimate
+    # source, so all of them are loaded; results.json is still the run the post
+    # reports and the only one the gates below look at.
+    runs = [data] + [json.loads(f.read_text())
+                     for f in sorted(exp.glob("results-*.json"))]
+
+    # Corroboration from outside the harness is quoted in posts too, and it is
+    # committed for exactly that reason, so it counts as a source.
+    cross = exp / "crosscheck.json"
+    extra_facts: list[float] = []
+    if cross.exists():
+        def _numbers(o):
+            if isinstance(o, bool):
+                return
+            if isinstance(o, (int, float)):
+                yield float(o)
+            elif isinstance(o, dict):
+                for v in o.values():
+                    yield from _numbers(v)
+            elif isinstance(o, list):
+                for v in o:
+                    yield from _numbers(v)
+        extra_facts = list(_numbers(json.loads(cross.read_text())))
+    measured = [r["ns_per_op"] for d in runs for r in d["results"]]
+    facts = ([v for d in runs for v in d["facts"].values() if isinstance(v, (int, float))]
+             + extra_facts)
     values = measured + facts
     # Differences and ratios between measurements are quoted constantly ("the
     # gap is 112 ns", "4,412x"), so they count as sourced too.
@@ -94,6 +126,30 @@ def main(post_path: str) -> int:
             unmatched.append(f"  {m.group(0)!r}  (line {body[:m.start()].count(chr(10)) + 1})")
 
     print(f"{post_path}: {checked} figures checked against {slug.group(1)}/results.json")
+
+    # A run taken while the machine was delivering a fraction of its normal
+    # speed is precise, reproducible and wrong: on 2026-09-03 a whole suite came
+    # back 2.1-3.6x slow with every measurement converging. If the run was
+    # throttled, the post has to say so, on the same terms as an unconverged
+    # measurement -- disclose it or do not publish the figure.
+    speed = data.get("machine_speed")
+    if speed and speed.get("throttled"):
+        disclosed = "machine was running slowly" in text
+        print(f"\n{'note' if disclosed else '!!'}: this run was measured at "
+              f"{speed['ratio']:.2f}x of the machine's best recorded speed "
+              f"(floor {speed['floor']}); absolute figures read "
+              f"~{1 / speed['ratio']:.1f}x high.")
+        if not disclosed:
+            print("   the post does not contain the phrase 'machine was running slowly'; "
+                  "either re-measure on a quiet machine or disclose it.")
+            return 1
+        print("   the post discloses this.")
+    elif speed:
+        print(f"machine speed during that run: {speed['ratio']:.2f}x of the best recorded")
+    else:
+        print("note: this run predates the machine-speed reference; its absolute "
+              "figures have no accuracy warrant.")
+
     if data.get("unstable_results"):
         # Quoting one of these is only acceptable if the post says so. The
         # disclosure phrase is the contract: no disclosure, no publication.

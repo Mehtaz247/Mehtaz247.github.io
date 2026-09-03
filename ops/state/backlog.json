@@ -1,7 +1,18 @@
 {
-  "updated": "2026-08-31",
-  "note": "Candidate posts. `contested_belief` is the thing readers currently believe that the post would test -- an idea without one is usually not worth writing, because confirming the obvious does not earn a reader's time. Ideas are pruned as aggressively as they are added.",
+  "updated": "2026-09-03",
+  "note": "Candidate posts. `contested_belief` is the thing readers currently believe that the post would test -- an idea without one is usually not worth writing, because confirming the obvious does not earn a reader's time. Ideas are pruned as aggressively as they are added. As of 2026-09-03, also record whether an idea's headline is an absolute constant or a within-run comparison: constants cannot be published from a throttled machine, comparisons can.",
   "ready": [
+    {
+      "slug": "converged-and-wrong",
+      "title": "Your benchmark converged. It is still wrong.",
+      "question": "What does a benchmark's noise statistic actually tell you, and what can it never tell you?",
+      "contested_belief": "If a benchmark's numbers are tight and reproducible, they are right. If you are worried, take more samples.",
+      "why_now": "Stopped being hypothetical on 2026-09-03. This blog's own suite came back 2.1x-3.6x wrong on 32 of 32 measurements with every one passing its convergence check, and the diagnosis is fully committed: the August harness, the current harness and stdlib timeit agreeing with each other and disagreeing with the published run; two CPython builds agreeing; wall clock and thread CPU time agreeing to 0.4%, which rules out preemption; QOS_CLASS_BACKGROUND putting the thread on efficiency cores. Every noise statistic in every benchmark suite measures sample consistency, and a uniformly slow machine is perfectly consistent. That is a real gap in what engineers believe about their own measurements.",
+      "design": "Mostly already run -- the material is in experiments/python-call-overhead/crosscheck.json and results-2026-09-03-slow.json. Needs: the same statement measured across QoS classes and machine states with every standard noise statistic computed alongside, showing that none of them move while the answer moves 3x; and the yardstick fix generalised so a reader can apply it to their own suite.",
+      "risk": "The 2026-08-31 note stands: this is a post about our own tooling, which is close to navel-gazing. It only works framed entirely as 'here is how to know whether YOUR benchmark is lying to you', with our failure as the worked example rather than the subject. The honest self-indictment is what makes it readable -- a post that reported this as someone else's mistake would be worth much less.",
+      "blocked_on": "Needs at least one measurement taken at full machine speed to show the contrast, which needs an idle laptop. Until then it cannot be written.",
+      "confidence_it_is_interesting": "high"
+    },
     {
       "slug": "python-startup-cost",
       "title": "What does `import` cost?",
@@ -15,7 +26,7 @@
       "slug": "index-selectivity-crossover",
       "question": "At what selectivity does SQLite stop using an index and scan the table instead?",
       "contested_belief": "An index always makes a query faster; if a query is slow, add an index.",
-      "why_now": "Direct sequel to the SELECT * post, which showed the access path is what actually matters. The planner abandons an index somewhere around 'a few percent of rows', and almost nobody knows the number or that it exists. EXPLAIN QUERY PLAN makes the switch point directly observable, and ANALYZE/STAT4 changes it -- so the post can show the planner making a decision, not just a timing curve. The engine can now render generated charts (added for post 3), and this experiment is a sweep whose whole point is a curve with a switch point in it, so it is the natural next use of that.",
+      "why_now": "Direct sequel to the SELECT * post, which showed the access path is what actually matters. The planner abandons an index somewhere around 'a few percent of rows', and almost nobody knows the number or that it exists. EXPLAIN QUERY PLAN makes the switch point directly observable, and ANALYZE/STAT4 changes it -- so the post can show the planner making a decision, not just a timing curve. The engine can now render generated charts (added for post 3), and this experiment is a sweep whose whole point is a curve with a switch point in it, so it is the natural next use of that. As of 2026-09-03 this is also the only ready idea whose headline survives a throttled machine: the answer is a planner decision and a crossover point, read from EXPLAIN QUERY PLAN, not a nanosecond constant. Prefer it whenever machine_speed.ratio is below 0.75.",
       "design": "Fixed table, sweep the fraction of matching rows from 0.01% to 100%. Record the plan at each point alongside the timing, with and without ANALYZE. The crossover is the headline number.",
       "confidence_it_is_interesting": "high"
     },
@@ -64,14 +75,6 @@
       "why_now": "Post 3 found that `x in {1, 2, 3}` compiles to a frozenset constant and runs 3.2x faster than the tuple form, while `x in {a, b, c}` builds a set on every evaluation and is 1.8x *slower* -- the same syntax with opposite answers, decided by whether the members are constants. That boundary is invisible in the source and nobody knows where it is.",
       "risk": "Reads as trivia unless every finding is tied to a form people actually write. The `in {...}` result earns its place because it is a real habit; a catalogue of what the peephole optimiser does would not.",
       "confidence_it_is_interesting": "medium-high"
-    },
-    {
-      "slug": "benchmark-noise",
-      "question": "How wrong is a microbenchmark on a machine that is doing something else?",
-      "contested_belief": "timeit gives you the number; if you want it cleaner, run more repeats.",
-      "why_now": "Post 3's harness work produced the raw material without meaning to: the same set lookup read anywhere from 12ns to 68ns depending on sampling strategy, and the standard median-based noise check would have rejected measurements that an independent implementation agreed with to 1.3%.",
-      "risk": "High. This is a post about our own tooling, which is close to navel-gazing, and the blog's value is answers about other people's code. Only write it if it can be framed entirely as 'here is how to know whether *your* benchmark is lying to you', with the harness as an example rather than the subject.",
-      "confidence_it_is_interesting": "medium"
     }
   ],
   "rejected": [

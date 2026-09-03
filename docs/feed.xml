@@ -25,6 +25,28 @@ over a short contiguous array is cache-friendly, and a hash lookup has a fixed
 cost the scan doesn&amp;#39;t pay. Below ten or twenty elements the list is faster.&lt;/em&gt;&lt;/p&gt;
 &lt;p&gt;Both sides are quoting asymptotics at each other. Neither is quoting a number.
 Here is the number, and it is much smaller than the argument assumes.&lt;/p&gt;
+&lt;aside class=&quot;callout callout-note&quot;&gt;&lt;p class=&quot;callout-label&quot;&gt;NOTE&lt;/p&gt;&lt;p&gt;&lt;strong&gt;Correction, 2026-09-03.&lt;/strong&gt; The &lt;strong&gt;absolute nanosecond figures in this post are
+too high, by roughly a factor of three.&lt;/strong&gt; The machine was running slowly when
+they were measured, and nothing in the harness noticed.&lt;/p&gt;
+&lt;p&gt;Four days after publication, re-running an older experiment produced numbers
+2.83x higher than its published run, with every measurement passing the
+convergence check. The cause was the machine: benchmarks here run at
+background scheduling priority, which on Apple silicon means the efficiency
+cores. This post&amp;#39;s own cross-check pins it to the same state — it recorded an
+empty timing loop at 10.33 ns on 31 August, and the identical code measured
+10.46 ns on 3 September, 1.3% apart, when the machine was independently
+measured at 0.36 of its best recorded speed.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;What this does not change:&lt;/strong&gt; the crossover point, the flat-versus-linear
+shape of the two curves, and the ordering of every comparison here. Those are
+within-run comparisons and they are what the post is about.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;What it does change:&lt;/strong&gt; every figure quoted in nanoseconds, and — because the
+slowdown is not a clean scalar, ranging from 2.1x to 3.6x across operations —
+ratios between distant rows are good to roughly ±20% rather than to the
+precision printed. Read the constants as upper bounds on this laptop.&lt;/p&gt;
+&lt;p&gt;The full diagnosis is in
+&lt;a href=&quot;/p/python-call-overhead/#what-went-wrong-with-these-numbers&quot;&gt;What a Python function call actually costs&lt;/a&gt;.
+Every run now records a machine-speed ratio so this cannot recur silently;
+this experiment will be re-measured when the laptop is next idle.&lt;/p&gt;&lt;/aside&gt;
 &lt;h2 id=&quot;the-crossover&quot;&gt;The crossover&lt;a class=&quot;anchor&quot; href=&quot;#the-crossover&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
 &lt;p&gt;Container size from 1 to 10,000, sweeping &lt;code&gt;x in lst&lt;/code&gt; against &lt;code&gt;x in st&lt;/code&gt;, for a
 &lt;strong&gt;hit&lt;/strong&gt; — the probe is present, at the midpoint, which is the mean scan length
@@ -410,6 +432,19 @@ nothing and keep decorators that cost four times as much as the code they wrap.&
 &lt;p&gt;So here is the table. Every row was measured in the same process, on the same
 machine, in the same run, with the statement inlined directly into the timing
 loop so that nothing but the operation itself sits between the two clock reads.&lt;/p&gt;
+&lt;aside class=&quot;callout callout-note&quot;&gt;&lt;p class=&quot;callout-label&quot;&gt;NOTE&lt;/p&gt;&lt;p&gt;&lt;strong&gt;Correction, 2026-09-03.&lt;/strong&gt; This experiment was re-run five days after
+publication and every one of its 32 measurements came back higher — a median
+of 2.83x, ranging from 2.13x to 3.62x. The cause is not the code. It is that
+the machine was running slowly, and neither the post nor the harness recorded
+how fast the machine was at all.&lt;/p&gt;
+&lt;p&gt;The table below is unchanged, because it is still the fastest this machine has
+been observed to run: timing noise is additive, so the lowest observation is
+the best estimate of true cost. But read these as &lt;strong&gt;peak&lt;/strong&gt; figures for this
+laptop, not typical ones. On a busy machine the same code measures roughly
+three times slower, and the ratios between rows shift by up to 20%. The full
+account is in &lt;a href=&quot;#what-went-wrong-with-these-numbers&quot;&gt;What went wrong with these numbers&lt;/a&gt;
+below, and the slow run is committed alongside the original as
+&lt;code&gt;results-2026-09-03-slow.json&lt;/code&gt;.&lt;/p&gt;&lt;/aside&gt;
 &lt;h2 id=&quot;the-numbers&quot;&gt;The numbers&lt;a class=&quot;anchor&quot; href=&quot;#the-numbers&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
 &lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
 &lt;thead&gt;&lt;tr&gt;&lt;th&gt;Operation&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;ns/op&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;vs. a plain call&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
@@ -562,21 +597,76 @@ load-bearing: measuring &lt;code&gt;lambda: x.y&lt;/code&gt; would silently add 
 call to every result, which is larger than most of the things on this list.&lt;/p&gt;
 &lt;p&gt;An empty loop is timed under identical conditions and subtracted, so each figure
 is the marginal cost of the operation rather than the cost of the operation plus
-a &lt;code&gt;for&lt;/code&gt;. Iteration counts are calibrated so a trial runs at least 50ms, putting
+a &lt;code&gt;for&lt;/code&gt;. Iteration counts are calibrated so a trial runs at least 50 ms, putting
 timer resolution well below the noise. Each statement runs nine trials, and the
 &lt;strong&gt;minimum&lt;/strong&gt; is reported: timing noise on a general-purpose OS is additive, so the
-fastest observed run is the closest estimate of the true cost. The median and
-the spread are recorded in the raw JSON, and no figure here came from a run with
-a spread above 15%.&lt;/p&gt;
-&lt;p&gt;That paragraph describes the harness as it stood when these numbers were taken.
-On 2026-08-31 it was rewritten — many short trials instead of a few long ones,
-and a convergence check on the minimum instead of a threshold on the spread —
-because the old scheme was not reliable below a microsecond on a busy machine.
-The reasoning is in
-&lt;a href=&quot;/p/dict-vs-list-crossover/&quot;&gt;At what size does a dict beat a list?&lt;/a&gt;. Re-running
-this experiment today therefore samples differently from the run above; the
-figures here have not yet been re-measured under the new scheme, and this note
-will be replaced by the new numbers when they have.&lt;/p&gt;
+fastest observed run is the closest estimate of the true cost.&lt;/p&gt;
+&lt;h2 id=&quot;what-went-wrong-with-these-numbers&quot;&gt;What went wrong with these numbers&lt;a class=&quot;anchor&quot; href=&quot;#what-went-wrong-with-these-numbers&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
+&lt;p&gt;The table above was measured on 2026-08-29. On 2026-09-03 the same script was
+run again, and every single measurement came back higher:&lt;/p&gt;
+&lt;div class=&quot;table-wrap&quot;&gt;&lt;table&gt;
+&lt;thead&gt;&lt;tr&gt;&lt;th&gt;&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;2026-08-29&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;2026-09-03&lt;/th&gt;&lt;th style=&quot;text-align:right&quot;&gt;factor&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;integer addition&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.29&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;5.62&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.45x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;plain function, no args&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;13.4&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;36.2&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;2.71x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;classmethod&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;44.0&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;134.0&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;3.05x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;decorator, &lt;code&gt;*args&lt;/code&gt;/&lt;code&gt;**kwargs&lt;/code&gt;&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;51.9&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;166.6&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;3.21x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;three stacked decorators&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;135.5&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;445.4&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;3.29x&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td&gt;&lt;code&gt;functools.lru_cache&lt;/code&gt; hit&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;23.0&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;83.3&lt;/td&gt;&lt;td style=&quot;text-align:right&quot;&gt;3.62x&lt;/td&gt;&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;&lt;/div&gt;
+&lt;p&gt;All 32 measurements moved, with a median factor of 2.83x. &lt;strong&gt;Not one of them was
+flagged as unreliable.&lt;/strong&gt; The harness checks whether a measurement converged — it
+splits the timing samples into interleaved halves and compares the two minima —
+and by that standard the September run was excellent, with every measurement
+agreeing with itself to within 6.5% and most within 2%.&lt;/p&gt;
+&lt;p&gt;Three candidate explanations, and what each was worth:&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;It was not the harness.&lt;/strong&gt; The harness was rewritten between the two runs. So
+the August version was checked out of git and run again on 3 September: it
+reported 48.9 ns for a plain call, against the current harness&amp;#39;s 36.2 ns the same
+afternoon. Both are near each other and both are nowhere near 13.4. For a third
+opinion outside this repository entirely, stdlib &lt;code&gt;timeit&lt;/code&gt; was pointed at the same
+statement and returned 37.2 ns. Three independent implementations agreed with
+each other and disagreed with August.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;It was not the interpreter.&lt;/strong&gt; The August run recorded CPython 3.13.0 and the
+September run 3.13.1 — a different binary, not just a different version string.
+Both were still installed, so &lt;code&gt;timeit&lt;/code&gt; was run under each in turn on the same
+statement: 40.7 ns and 37.2 ns. Under 10% apart, not a threefold difference.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;It was the machine.&lt;/strong&gt; Benchmarks here run under a scheduled background agent,
+and that process tree inherits &lt;code&gt;QOS_CLASS_BACKGROUND&lt;/code&gt;. On Apple silicon, macOS
+schedules background-QoS threads onto the efficiency cores, and how much
+throughput those deliver depends on what else is running — on 3 September that
+was a browser with fifteen renderer processes, all at higher priority. Raising
+the thread&amp;#39;s QoS from inside the process changes nothing; the clamp is at the
+task level.&lt;/p&gt;
+&lt;p&gt;The measurement is not being &lt;em&gt;interrupted&lt;/em&gt;, either, which is the failure mode the
+harness was already designed for. Timing the same loop with &lt;code&gt;thread_time&lt;/code&gt; — which
+counts only the time the thread was actually on a CPU — gives 36.3 ns against
+36.2 ns of wall clock, 0.4% apart. Essentially nothing is lost to preemption. The
+cycles themselves are slower.&lt;/p&gt;
+&lt;h3 id=&quot;the-lesson-which-is-the-useful-part&quot;&gt;The lesson, which is the useful part&lt;a class=&quot;anchor&quot; href=&quot;#the-lesson-which-is-the-useful-part&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h3&gt;
+&lt;p&gt;&lt;strong&gt;Convergence measures precision, not accuracy.&lt;/strong&gt; A benchmark pinned to a slow
+core runs every window uniformly slowly, so independent halves of the run agree
+beautifully on a floor that is three times too high. Every noise check in this
+harness — and every one in &lt;code&gt;timeit&lt;/code&gt;, and most of the ones in your benchmark
+suite — is a check on how &lt;em&gt;consistent&lt;/em&gt; the samples are. Consistency is exactly
+what a uniformly throttled machine delivers.&lt;/p&gt;
+&lt;p&gt;If you take one thing from this post that is not a nanosecond count, take that
+one. A tight, reproducible, well-converged benchmark number can be off by 3x, and
+none of the statistics computed from the samples will tell you.&lt;/p&gt;
+&lt;p&gt;The fix here is an external yardstick rather than a better statistic: one fixed
+reference kernel, timed at the start and end of every run, compared against the
+fastest this machine has ever been observed to run it. Every result file now
+carries a &lt;code&gt;machine_speed&lt;/code&gt; block with that ratio, and a run below 0.75 of the
+record refuses to certify its own numbers. The September run scores 0.37.&lt;/p&gt;
+&lt;p&gt;That check did not exist when this table was measured, so these figures have no
+accuracy warrant of their own — only the argument that additive noise makes the
+lowest observation the best estimate, and that nothing since has measured this
+machine faster. The reference record and the reasoning are in
+[&lt;code&gt;experiments/lib/reference.json&lt;/code&gt;][ref]; the September run is committed next to
+the original as &lt;code&gt;results-2026-09-03-slow.json&lt;/code&gt;, and all three cross-checks above
+are reproducible with &lt;code&gt;run.py --crosscheck&lt;/code&gt;, which writes &lt;code&gt;crosscheck.json&lt;/code&gt;.&lt;/p&gt;
+&lt;h2 id=&quot;method-continued&quot;&gt;Method, continued&lt;a class=&quot;anchor&quot; href=&quot;#method-continued&quot; aria-label=&quot;Link to this section&quot;&gt;#&lt;/a&gt;&lt;/h2&gt;
 &lt;p&gt;Garbage collection is disabled during measurement. That is a real distortion —
 GC is not free in production — but allocation rates inside a microbenchmark
 loop bear no relation to a real workload, so leaving it on measures the harness
@@ -586,7 +676,8 @@ must hold if the timing is sound: that an empty statement registers as free,
 that ten copies of a statement cost about ten times one copy, that setup code
 does not leak into the measurement, and that two runs of the same statement
 agree. Those tests pass on the machine that produced this table.&lt;/p&gt;
-&lt;p&gt;[selftest]: https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/selftest.py&lt;/p&gt;</content>
+&lt;p&gt;[selftest]: https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/selftest.py
+[ref]: https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/reference.json&lt;/p&gt;</content>
   </entry>
   <entry>
     <title>Is SELECT * actually slower?</title>

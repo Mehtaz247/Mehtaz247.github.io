@@ -19,6 +19,34 @@ cost the scan doesn't pay. Below ten or twenty elements the list is faster.*
 Both sides are quoting asymptotics at each other. Neither is quoting a number.
 Here is the number, and it is much smaller than the argument assumes.
 
+> [!NOTE]
+> **Correction, 2026-09-03.** The **absolute nanosecond figures in this post are
+> too high, by roughly a factor of three.** The machine was running slowly when
+> they were measured, and nothing in the harness noticed.
+>
+> Four days after publication, re-running an older experiment produced numbers
+> 2.83x higher than its published run, with every measurement passing the
+> convergence check. The cause was the machine: benchmarks here run at
+> background scheduling priority, which on Apple silicon means the efficiency
+> cores. This post's own cross-check pins it to the same state — it recorded an
+> empty timing loop at 10.33 ns on 31 August, and the identical code measured
+> 10.46 ns on 3 September, 1.3% apart, when the machine was independently
+> measured at 0.36 of its best recorded speed.
+>
+> **What this does not change:** the crossover point, the flat-versus-linear
+> shape of the two curves, and the ordering of every comparison here. Those are
+> within-run comparisons and they are what the post is about.
+>
+> **What it does change:** every figure quoted in nanoseconds, and — because the
+> slowdown is not a clean scalar, ranging from 2.1x to 3.6x across operations —
+> ratios between distant rows are good to roughly ±20% rather than to the
+> precision printed. Read the constants as upper bounds on this laptop.
+>
+> The full diagnosis is in
+> [What a Python function call actually costs](/p/python-call-overhead/#what-went-wrong-with-these-numbers).
+> Every run now records a machine-speed ratio so this cannot recur silently;
+> this experiment will be re-measured when the laptop is next idle.
+
 ## The crossover
 
 Container size from 1 to 10,000, sweeping `x in lst` against `x in st`, for a

@@ -39,7 +39,7 @@
 
 <main><div class="wrap"><article>
   <header>
-    <div class="meta"><time datetime="2026-08-29">Aug 29, 2026</time> <span class="sep">/</span> 8 min</div>
+    <div class="meta"><time datetime="2026-08-29">Aug 29, 2026</time> <span class="sep">/</span> 11 min</div>
     <h1>What a Python function call actually costs</h1>
     <p class="standfirst">Thirty-two ways to invoke code in CPython 3.13, measured on the same machine in the same run. The expensive part of a decorator is not the decorating.</p>
     <p class="verdict"><strong>Result.</strong> A bare call is 13ns. A no-op decorator makes it 52ns — and almost all of that is argument repacking, not decoration. Fixing the wrapper signature gets it back to 28ns.</p>
@@ -52,6 +52,19 @@ nothing and keep decorators that cost four times as much as the code they wrap.<
 <p>So here is the table. Every row was measured in the same process, on the same
 machine, in the same run, with the statement inlined directly into the timing
 loop so that nothing but the operation itself sits between the two clock reads.</p>
+<aside class="callout callout-note"><p class="callout-label">NOTE</p><p><strong>Correction, 2026-09-03.</strong> This experiment was re-run five days after
+publication and every one of its 32 measurements came back higher — a median
+of 2.83x, ranging from 2.13x to 3.62x. The cause is not the code. It is that
+the machine was running slowly, and neither the post nor the harness recorded
+how fast the machine was at all.</p>
+<p>The table below is unchanged, because it is still the fastest this machine has
+been observed to run: timing noise is additive, so the lowest observation is
+the best estimate of true cost. But read these as <strong>peak</strong> figures for this
+laptop, not typical ones. On a busy machine the same code measures roughly
+three times slower, and the ratios between rows shift by up to 20%. The full
+account is in <a href="#what-went-wrong-with-these-numbers">What went wrong with these numbers</a>
+below, and the slow run is committed alongside the original as
+<code>results-2026-09-03-slow.json</code>.</p></aside>
 <h2 id="the-numbers">The numbers<a class="anchor" href="#the-numbers" aria-label="Link to this section">#</a></h2>
 <div class="table-wrap"><table>
 <thead><tr><th>Operation</th><th style="text-align:right">ns/op</th><th style="text-align:right">vs. a plain call</th></tr></thead>
@@ -204,21 +217,76 @@ load-bearing: measuring <code>lambda: x.y</code> would silently add a full 13ns 
 call to every result, which is larger than most of the things on this list.</p>
 <p>An empty loop is timed under identical conditions and subtracted, so each figure
 is the marginal cost of the operation rather than the cost of the operation plus
-a <code>for</code>. Iteration counts are calibrated so a trial runs at least 50ms, putting
+a <code>for</code>. Iteration counts are calibrated so a trial runs at least 50 ms, putting
 timer resolution well below the noise. Each statement runs nine trials, and the
 <strong>minimum</strong> is reported: timing noise on a general-purpose OS is additive, so the
-fastest observed run is the closest estimate of the true cost. The median and
-the spread are recorded in the raw JSON, and no figure here came from a run with
-a spread above 15%.</p>
-<p>That paragraph describes the harness as it stood when these numbers were taken.
-On 2026-08-31 it was rewritten — many short trials instead of a few long ones,
-and a convergence check on the minimum instead of a threshold on the spread —
-because the old scheme was not reliable below a microsecond on a busy machine.
-The reasoning is in
-<a href="/p/dict-vs-list-crossover/">At what size does a dict beat a list?</a>. Re-running
-this experiment today therefore samples differently from the run above; the
-figures here have not yet been re-measured under the new scheme, and this note
-will be replaced by the new numbers when they have.</p>
+fastest observed run is the closest estimate of the true cost.</p>
+<h2 id="what-went-wrong-with-these-numbers">What went wrong with these numbers<a class="anchor" href="#what-went-wrong-with-these-numbers" aria-label="Link to this section">#</a></h2>
+<p>The table above was measured on 2026-08-29. On 2026-09-03 the same script was
+run again, and every single measurement came back higher:</p>
+<div class="table-wrap"><table>
+<thead><tr><th></th><th style="text-align:right">2026-08-29</th><th style="text-align:right">2026-09-03</th><th style="text-align:right">factor</th></tr></thead>
+<tbody>
+<tr><td>integer addition</td><td style="text-align:right">2.29</td><td style="text-align:right">5.62</td><td style="text-align:right">2.45x</td></tr>
+<tr><td>plain function, no args</td><td style="text-align:right">13.4</td><td style="text-align:right">36.2</td><td style="text-align:right">2.71x</td></tr>
+<tr><td><code>classmethod</code></td><td style="text-align:right">44.0</td><td style="text-align:right">134.0</td><td style="text-align:right">3.05x</td></tr>
+<tr><td>decorator, <code>*args</code>/<code>**kwargs</code></td><td style="text-align:right">51.9</td><td style="text-align:right">166.6</td><td style="text-align:right">3.21x</td></tr>
+<tr><td>three stacked decorators</td><td style="text-align:right">135.5</td><td style="text-align:right">445.4</td><td style="text-align:right">3.29x</td></tr>
+<tr><td><code>functools.lru_cache</code> hit</td><td style="text-align:right">23.0</td><td style="text-align:right">83.3</td><td style="text-align:right">3.62x</td></tr>
+</tbody>
+</table></div>
+<p>All 32 measurements moved, with a median factor of 2.83x. <strong>Not one of them was
+flagged as unreliable.</strong> The harness checks whether a measurement converged — it
+splits the timing samples into interleaved halves and compares the two minima —
+and by that standard the September run was excellent, with every measurement
+agreeing with itself to within 6.5% and most within 2%.</p>
+<p>Three candidate explanations, and what each was worth:</p>
+<p><strong>It was not the harness.</strong> The harness was rewritten between the two runs. So
+the August version was checked out of git and run again on 3 September: it
+reported 48.9 ns for a plain call, against the current harness&#39;s 36.2 ns the same
+afternoon. Both are near each other and both are nowhere near 13.4. For a third
+opinion outside this repository entirely, stdlib <code>timeit</code> was pointed at the same
+statement and returned 37.2 ns. Three independent implementations agreed with
+each other and disagreed with August.</p>
+<p><strong>It was not the interpreter.</strong> The August run recorded CPython 3.13.0 and the
+September run 3.13.1 — a different binary, not just a different version string.
+Both were still installed, so <code>timeit</code> was run under each in turn on the same
+statement: 40.7 ns and 37.2 ns. Under 10% apart, not a threefold difference.</p>
+<p><strong>It was the machine.</strong> Benchmarks here run under a scheduled background agent,
+and that process tree inherits <code>QOS_CLASS_BACKGROUND</code>. On Apple silicon, macOS
+schedules background-QoS threads onto the efficiency cores, and how much
+throughput those deliver depends on what else is running — on 3 September that
+was a browser with fifteen renderer processes, all at higher priority. Raising
+the thread&#39;s QoS from inside the process changes nothing; the clamp is at the
+task level.</p>
+<p>The measurement is not being <em>interrupted</em>, either, which is the failure mode the
+harness was already designed for. Timing the same loop with <code>thread_time</code> — which
+counts only the time the thread was actually on a CPU — gives 36.3 ns against
+36.2 ns of wall clock, 0.4% apart. Essentially nothing is lost to preemption. The
+cycles themselves are slower.</p>
+<h3 id="the-lesson-which-is-the-useful-part">The lesson, which is the useful part<a class="anchor" href="#the-lesson-which-is-the-useful-part" aria-label="Link to this section">#</a></h3>
+<p><strong>Convergence measures precision, not accuracy.</strong> A benchmark pinned to a slow
+core runs every window uniformly slowly, so independent halves of the run agree
+beautifully on a floor that is three times too high. Every noise check in this
+harness — and every one in <code>timeit</code>, and most of the ones in your benchmark
+suite — is a check on how <em>consistent</em> the samples are. Consistency is exactly
+what a uniformly throttled machine delivers.</p>
+<p>If you take one thing from this post that is not a nanosecond count, take that
+one. A tight, reproducible, well-converged benchmark number can be off by 3x, and
+none of the statistics computed from the samples will tell you.</p>
+<p>The fix here is an external yardstick rather than a better statistic: one fixed
+reference kernel, timed at the start and end of every run, compared against the
+fastest this machine has ever been observed to run it. Every result file now
+carries a <code>machine_speed</code> block with that ratio, and a run below 0.75 of the
+record refuses to certify its own numbers. The September run scores 0.37.</p>
+<p>That check did not exist when this table was measured, so these figures have no
+accuracy warrant of their own — only the argument that additive noise makes the
+lowest observation the best estimate, and that nothing since has measured this
+machine faster. The reference record and the reasoning are in
+[<code>experiments/lib/reference.json</code>][ref]; the September run is committed next to
+the original as <code>results-2026-09-03-slow.json</code>, and all three cross-checks above
+are reproducible with <code>run.py --crosscheck</code>, which writes <code>crosscheck.json</code>.</p>
+<h2 id="method-continued">Method, continued<a class="anchor" href="#method-continued" aria-label="Link to this section">#</a></h2>
 <p>Garbage collection is disabled during measurement. That is a real distortion —
 GC is not free in production — but allocation rates inside a microbenchmark
 loop bear no relation to a real workload, so leaving it on measures the harness
@@ -228,7 +296,8 @@ must hold if the timing is sound: that an empty statement registers as free,
 that ten copies of a statement cost about ten times one copy, that setup code
 does not leak into the measurement, and that two runs of the same statement
 agree. Those tests pass on the machine that produced this table.</p>
-<p>[selftest]: https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/selftest.py</p></div>
+<p>[selftest]: https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/selftest.py
+[ref]: https://github.com/Mehtaz247/Mehtaz247.github.io/blob/main/experiments/lib/reference.json</p></div>
   <section class="repro">
   <h2>Reproduce this</h2>
   <p>The script that produced these numbers is in the repository at <code>experiments/python-call-overhead/</code>. Clone it and run it yourself &mdash; if your numbers differ from ours, that is a result worth reporting.</p>

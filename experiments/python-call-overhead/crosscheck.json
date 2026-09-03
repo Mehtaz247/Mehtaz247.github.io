@@ -1,0 +1,37 @@
+{
+  "note": "Corroboration for 'plain function, no args' from outside the house harness. See the post's 'What went wrong with these numbers' section.",
+  "measured_at": "2026-09-03T04:04:31Z",
+  "statement": "plain()",
+  "timeit_by_interpreter": {
+    "3.13.0 @ /usr/local/bin/python3": {
+      "version": "3.13.0",
+      "exe": "/usr/local/bin/python3",
+      "resolved": "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13",
+      "empty_loop_ns": 12.3,
+      "plain_call_ns": 40.67
+    },
+    "3.13.1 @ /opt/homebrew/bin/python3": {
+      "version": "3.13.1",
+      "exe": "/opt/homebrew/bin/python3",
+      "resolved": "/opt/homebrew/Cellar/python@3.13/3.13.1/Frameworks/Python.framework/Versions/3.13/bin/python3.13",
+      "empty_loop_ns": 10.46,
+      "plain_call_ns": 37.16
+    }
+  },
+  "wall_vs_cpu_time": {
+    "wall_clock_ns": 36.15,
+    "thread_cpu_time_ns": 36.31,
+    "difference_pct": 0.4,
+    "means": "If these agree, the timed windows are not losing time to preemption, so a slow result means slow cycles rather than an interrupted measurement."
+  },
+  "machine_speed": {
+    "kernel": "zero-argument Python function call, measured by bench() at its default sub-microsecond plan",
+    "observed_ns": 36.6,
+    "best_ns": 13.37,
+    "speed_ratio": 0.365,
+    "converged": true,
+    "stability_pct": 1.91,
+    "throttle_floor": 0.75
+  },
+  "august_harness_note": "The harness as it stood for the published run is recoverable with `git show 27abde4:experiments/lib/bench.py`. Run against this experiment on 2026-09-03 it reported 48.9 ns for a plain call, against 36.2 ns from the current harness and 37.2 ns from timeit the same afternoon -- all three far from the 13.4 ns published on 2026-08-29."
+}

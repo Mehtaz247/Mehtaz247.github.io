@@ -40,7 +40,7 @@
 
 <main><div class="wrap"><article>
   <header>
-    <div class="meta"><time datetime="2026-08-31">Aug 31, 2026</time> <span class="sep">/</span> 13 min</div>
+    <div class="meta"><time datetime="2026-08-31">Aug 31, 2026</time> <span class="sep">/</span> 15 min</div>
     <h1>At what size does a dict beat a list?</h1>
     <p class="standfirst">Everyone knows a set is O(1) and a list is O(n), and everyone also knows that for small collections the list wins anyway. Measured on CPython 3.13, the second half is wrong from the first element.</p>
     <p class="verdict"><strong>Result.</strong> At one element. A set beat a list on every miss measured, down to a one-element container, and on hits from two elements up — so the question worth asking is not how big the container is but whether you had to build it, which a set repays after about two lookups.</p>
@@ -53,6 +53,28 @@ over a short contiguous array is cache-friendly, and a hash lookup has a fixed
 cost the scan doesn&#39;t pay. Below ten or twenty elements the list is faster.</em></p>
 <p>Both sides are quoting asymptotics at each other. Neither is quoting a number.
 Here is the number, and it is much smaller than the argument assumes.</p>
+<aside class="callout callout-note"><p class="callout-label">NOTE</p><p><strong>Correction, 2026-09-03.</strong> The <strong>absolute nanosecond figures in this post are
+too high, by roughly a factor of three.</strong> The machine was running slowly when
+they were measured, and nothing in the harness noticed.</p>
+<p>Four days after publication, re-running an older experiment produced numbers
+2.83x higher than its published run, with every measurement passing the
+convergence check. The cause was the machine: benchmarks here run at
+background scheduling priority, which on Apple silicon means the efficiency
+cores. This post&#39;s own cross-check pins it to the same state — it recorded an
+empty timing loop at 10.33 ns on 31 August, and the identical code measured
+10.46 ns on 3 September, 1.3% apart, when the machine was independently
+measured at 0.36 of its best recorded speed.</p>
+<p><strong>What this does not change:</strong> the crossover point, the flat-versus-linear
+shape of the two curves, and the ordering of every comparison here. Those are
+within-run comparisons and they are what the post is about.</p>
+<p><strong>What it does change:</strong> every figure quoted in nanoseconds, and — because the
+slowdown is not a clean scalar, ranging from 2.1x to 3.6x across operations —
+ratios between distant rows are good to roughly ±20% rather than to the
+precision printed. Read the constants as upper bounds on this laptop.</p>
+<p>The full diagnosis is in
+<a href="/p/python-call-overhead/#what-went-wrong-with-these-numbers">What a Python function call actually costs</a>.
+Every run now records a machine-speed ratio so this cannot recur silently;
+this experiment will be re-measured when the laptop is next idle.</p></aside>
 <h2 id="the-crossover">The crossover<a class="anchor" href="#the-crossover" aria-label="Link to this section">#</a></h2>
 <p>Container size from 1 to 10,000, sweeping <code>x in lst</code> against <code>x in st</code>, for a
 <strong>hit</strong> — the probe is present, at the midpoint, which is the mean scan length

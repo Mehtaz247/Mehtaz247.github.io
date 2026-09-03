@@ -56,6 +56,16 @@ A post ships only if you can answer yes to all of:
   **not** gate on `spread_pct` — under machine load the median is polluted while
   the minimum is not, so spread measures the laptop rather than the benchmark.
   See the 2026-08-31 journal entry for the evidence behind this.
+- **The machine was running at full speed.** `machine_speed.ratio` in
+  `results.json` is at or above `0.75`, and `machine_speed.throttled` is false.
+  Convergence is precision and says nothing about accuracy: on 2026-09-03 an
+  entire suite came back 2.1–3.6x slow with every measurement converging and
+  none flagged, because a thread parked on an efficiency core is uniformly slow
+  rather than noisy. If the ratio is low, **do not publish costs from that run** —
+  the distortion is not a clean scalar, so dividing it out does not work either.
+  Wait for an idle machine, or make the claim from a within-run comparison
+  (a crossover, an ordering, a sign) that a slow machine does not move.
+  See the 2026-09-03 journal entry and `experiments/lib/reference.json`.
 - At least one headline number is corroborated from outside the house harness:
   an independent implementation, a structural count that does not depend on
   timing, or a model fitted on part of the sweep and checked against the rest.
