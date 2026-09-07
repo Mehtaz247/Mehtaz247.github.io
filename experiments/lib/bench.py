@@ -120,6 +120,7 @@ class Result:
     p10_ns: float = 0.0         # 10th percentile, a less brittle floor estimate
     window_ms: float = 0.0      # length of one timed trial at the measured cost
     below_noise_floor: bool = False
+    undersampled: bool = False  # too expensive to sample enough to find its floor
     note: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -141,6 +142,12 @@ class Result:
         perfectly reproducible, and refusing that measurement would mean
         refusing to measure anything on a machine doing other work.
         """
+        if self.undersampled:
+            # The budget cap cut the trial count below the level at which a
+            # millisecond-scale minimum was measured to settle. Split-half
+            # agreement cannot rescue this: under-sampling biases both halves
+            # the same way, so they agree on a floor neither of them found.
+            return False
         if self.below_noise_floor:
             return True
         absolute = self.stability_pct / 100 * self.ns_per_op
@@ -155,7 +162,9 @@ class Result:
 
     def __str__(self) -> str:
         flag = "  (below noise floor)" if self.below_noise_floor else ""
-        if not self.trustworthy:
+        if self.undersampled:
+            flag += f"  ** UNDERSAMPLED at {self.trials} trials, do not publish **"
+        elif not self.trustworthy:
             flag += "  ** UNSTABLE, do not publish **"
         return (f"{self.name:<42} {self.format_ns():>9} ns"
                 f"   (stability {self.stability_pct:>5.1f}%,"
@@ -200,31 +209,57 @@ NOISE_FLOOR_NS = 0.5
 
 # Sampling plans, chosen by how expensive one operation turns out to be.
 #
-# The threat model differs by scale. For a 30ns operation the danger is that a
-# scheduler preemption lands inside the single long trial you took, so the
-# answer is many short windows: it only takes one clean window to see the
-# floor. For a 30ms operation a single trial already dwarfs any preemption,
-# and the danger is instead per-trial setup and timer effects, so fewer,
-# longer trials are better and cheaper.
+# For a 30ns operation the danger is that a scheduler preemption lands inside
+# the single long trial you took, so the answer is many short windows: it only
+# takes one clean window to see the floor.
 #
-# (trials, min_trial_s), selected by the calibrated cost of one operation.
-# Trial counts were chosen by measuring convergence, not guessed: on this
-# machine under load, a sub-microsecond operation's minimum was still drifting
-# at 101 trials and had settled by ~400, while a 150-microsecond operation was
-# settled by ~200. The cost is roughly five seconds per measurement, which is
-# the right trade for a suite that runs once a week and is published from.
+# The millisecond tier used to read (15, 0.050), justified by the argument that
+# "for a 30ms operation a single trial already dwarfs any preemption". **That
+# reasoning was wrong and it was never measured.** What matters when estimating
+# a floor is not whether interference is small relative to the window, but the
+# probability that at least one window is clean -- and a longer window is *more*
+# likely to contain interference, not less. Measured on 2026-09-07 against a
+# 55ms SQLite scan on a machine at load ~3:
+#
+#     trials     min      stability   verdict
+#         15    86.8 ms       5.2%    unstable
+#         40    79.5 ms       1.6%    CONVERGED -- and 45% too high
+#        100    62.2 ms       6.3%    unstable
+#        200    54.7 ms       6.9%    unstable
+#        400    55.5 ms       1.2%    converged
+#
+# The minimum drifts downward by 37% between 15 and 400 trials, and at 40
+# trials the split-half check *certifies* a figure 45% above the settled floor,
+# because both halves are under-sampled in the same direction. That is the
+# 2026-09-03 failure repeating in a new place: a consistency statistic cannot
+# detect an error shared by every sample.
+#
+# So the millisecond tier now targets the same ~400 trials the evidence
+# supports. Because that is unaffordable for a very expensive operation, the
+# count is capped by a wall-clock budget, and any measurement whose count was
+# cut below MIN_MS_TRIALS by that cap is marked `undersampled` and refuses to
+# be trustworthy. The harness would rather refuse an expensive measurement than
+# quietly report a floor it did not find; the fix for a refusal is to make the
+# operation cheaper, not to publish it anyway.
+MS_TRIAL_TARGET = 401
+MIN_MS_TRIALS = 150
+MS_BUDGET_S = 25.0
+
 _PLANS = [
     (1_000.0,      (401, 0.006)),   # sub-microsecond: many short windows
     (1_000_000.0,  (151, 0.020)),   # microseconds
-    (float("inf"), (15,  0.050)),   # milliseconds and up
 ]
 
 
 def _plan(ns_estimate: float) -> tuple[int, float]:
+    """(trials, min_trial_s) for an operation costing `ns_estimate` per call."""
     for ceiling, plan in _PLANS:
         if ns_estimate < ceiling:
             return plan
-    return _PLANS[-1][1]
+    # Millisecond and up: as many trials as the budget allows, up to the target.
+    op_s = ns_estimate / 1e9
+    affordable = int(MS_BUDGET_S / op_s) if op_s > 0 else MS_TRIAL_TARGET
+    return max(1, min(MS_TRIAL_TARGET, affordable)), 0.0
 
 
 def bench(
@@ -265,6 +300,7 @@ def bench(
     ns_estimate = elapsed / iterations
 
     planned_trials, planned_window = _plan(ns_estimate)
+    auto_plan = trials is None and min_trial_s is None
     trials = planned_trials if trials is None else trials
     min_trial_s = planned_window if min_trial_s is None else min_trial_s
 
@@ -315,6 +351,24 @@ def bench(
 
     samples, overhead = measure(iterations)
     true_cost = min(samples)
+
+    # The sampling *tier* was chosen from the probe, which is a single
+    # observation and can land during a burst of load. A probe inflated past
+    # 1ms would drop a microsecond operation into the millisecond plan and
+    # sample it once per trial. Now that a real minimum exists, re-derive the
+    # plan from it and redo the measurement if the tier was wrong. Same
+    # reasoning as the window correction below, applied one level up; only done
+    # when the caller left the plan to the harness.
+    if auto_plan:
+        re_trials, re_window = _plan(true_cost)
+        if (re_trials, re_window) != (planned_trials, planned_window):
+            planned_trials, planned_window = re_trials, re_window
+            trials, min_trial_s = re_trials, re_window
+            target_ns = min_trial_s * 1e9
+            iterations = max(1, int(target_ns / max(true_cost, 1e-3)))
+            samples, overhead = measure(iterations)
+            true_cost = min(samples)
+
     if iterations * true_cost < target_ns * 0.9 and iterations < 500_000_000:
         iterations = min(500_000_000, max(iterations + 1, int(target_ns / max(true_cost, 1e-3))))
         samples, overhead = measure(iterations)
@@ -339,11 +393,17 @@ def bench(
     ordered = sorted(samples)
     p10 = max(0.0, ordered[max(0, int(len(ordered) * 0.10))] - overhead)
 
+    # Judged on the cost actually measured and the trial count actually used --
+    # not on the probe's guess, and not on who chose the count. A caller passing
+    # `trials=40` by hand hits the same physics as the budget cap, so exempting
+    # the override would make the flag trivial to silence.
+    undersampled = (true_cost >= 1_000_000.0 and trials < MIN_MS_TRIALS)
+
     return Result(
         name=name, ns_per_op=lo, median_ns=med, spread_pct=spread,
         iterations=iterations, trials=trials, stability_pct=stability,
         p10_ns=p10, window_ms=iterations * min(samples) / 1e6,
-        below_noise_floor=below, note=note, extra=extra,
+        below_noise_floor=below, undersampled=undersampled, note=note, extra=extra,
     )
 
 
@@ -449,7 +509,11 @@ class Suite:
         # Re-run it once with three times the trials and keep that result
         # unconditionally -- keeping whichever of the two looked better would
         # be selecting on the very statistic used to decide publishability.
-        if not r.trustworthy:
+        # Re-sampling fixes noise, not expense: an undersampled result was
+        # capped by the wall-clock budget, so running it three times over would
+        # cost minutes and still land short of MIN_MS_TRIALS. Report it and let
+        # the experiment be redesigned smaller.
+        if not r.trustworthy and not r.undersampled:
             print(f"{'  re-sampling (unstable)':<42} {r.stability_pct:>9.1f}%", flush=True)
             r = bench(name, stmt, **{**kw, "trials": r.trials * 3})
             r.extra["resampled"] = True

@@ -1,17 +1,18 @@
 {
-  "updated": "2026-09-03",
-  "note": "Candidate posts. `contested_belief` is the thing readers currently believe that the post would test -- an idea without one is usually not worth writing, because confirming the obvious does not earn a reader's time. Ideas are pruned as aggressively as they are added. As of 2026-09-03, also record whether an idea's headline is an absolute constant or a within-run comparison: constants cannot be published from a throttled machine, comparisons can.",
+  "updated": "2026-09-07",
+  "note": "Candidate posts. `contested_belief` is the thing readers currently believe that the post would test -- an idea without one is usually not worth writing, because confirming the obvious does not earn a reader's time. Ideas are pruned as aggressively as they are added. Record whether an idea's headline is an absolute constant or a within-run comparison: constants cannot be published from a throttled machine, comparisons can. As of 2026-09-07 add a third category and prefer it above both -- a *structural* headline, read from a query plan, a bytecode listing or a byte count, which depends on no timing at all and is therefore immune to every failure this harness has had so far.",
   "ready": [
     {
       "slug": "converged-and-wrong",
       "title": "Your benchmark converged. It is still wrong.",
       "question": "What does a benchmark's noise statistic actually tell you, and what can it never tell you?",
       "contested_belief": "If a benchmark's numbers are tight and reproducible, they are right. If you are worried, take more samples.",
-      "why_now": "Stopped being hypothetical on 2026-09-03. This blog's own suite came back 2.1x-3.6x wrong on 32 of 32 measurements with every one passing its convergence check, and the diagnosis is fully committed: the August harness, the current harness and stdlib timeit agreeing with each other and disagreeing with the published run; two CPython builds agreeing; wall clock and thread CPU time agreeing to 0.4%, which rules out preemption; QOS_CLASS_BACKGROUND putting the thread on efficiency cores. Every noise statistic in every benchmark suite measures sample consistency, and a uniformly slow machine is perfectly consistent. That is a real gap in what engineers believe about their own measurements.",
-      "design": "Mostly already run -- the material is in experiments/python-call-overhead/crosscheck.json and results-2026-09-03-slow.json. Needs: the same statement measured across QoS classes and machine states with every standard noise statistic computed alongside, showing that none of them move while the answer moves 3x; and the yardstick fix generalised so a reader can apply it to their own suite.",
-      "risk": "The 2026-08-31 note stands: this is a post about our own tooling, which is close to navel-gazing. It only works framed entirely as 'here is how to know whether YOUR benchmark is lying to you', with our failure as the worked example rather than the subject. The honest self-indictment is what makes it readable -- a post that reported this as someone else's mistake would be worth much less.",
-      "blocked_on": "Needs at least one measurement taken at full machine speed to show the contrast, which needs an idle laptop. Until then it cannot be written.",
-      "confidence_it_is_interesting": "high"
+      "why_now": "Strengthened considerably on 2026-09-07 by a *second, independent* instance of the same failure, which turns the post from an anecdote into a pattern. Instance one (2026-09-03): a whole suite 2.1-3.6x slow, 32 of 32 measurements converging, cause was a thread parked on an efficiency core. Instance two (2026-09-07): a 55ms query sampled 40 times passed the same convergence check at a figure 45% above its settled floor, cause was too few samples to find the floor at all. Different mechanisms, identical signature -- every sample wrong in the same direction, so every consistency statistic reports perfect health. Two cases make the general claim: a noise statistic can only ever detect errors that vary across samples, and the expensive errors do not vary. Both are fully reproducible from committed code.",
+      "design": "Two worked examples, both from this blog's own tooling, both re-runnable. For each, compute every standard noise statistic (stddev, spread, split-half, confidence interval) and show none of them move while the answer moves 45% or 3x. Then generalise the fix: a noise statistic is an internal check and cannot catch a shared error, so a benchmark needs at least one *external* reference -- a fixed kernel timed against its own record, or a second implementation, or a structural count.",
+      "risk": "Still a post about our own tooling. Only works framed as 'here is how to know whether YOUR benchmark is lying to you', with our two failures as the worked examples. The self-indictment is what makes it readable. The second instance reduces the navel-gazing risk: one failure is a bug report, two with different causes and the same signature is a general claim about measurement.",
+      "blocked_on": "Weaker than it was. The 45%-too-high example was measured on a throttled machine and is a within-run comparison of trial counts, which a uniformly slow machine does not move -- so that half may be publishable as-is. The contrast against a full-speed measurement would still make it much stronger.",
+      "confidence_it_is_interesting": "high",
+      "headline_type": "within-run comparison; no absolute constants required"
     },
     {
       "slug": "python-startup-cost",
@@ -26,9 +27,12 @@
       "slug": "index-selectivity-crossover",
       "question": "At what selectivity does SQLite stop using an index and scan the table instead?",
       "contested_belief": "An index always makes a query faster; if a query is slow, add an index.",
-      "why_now": "Direct sequel to the SELECT * post, which showed the access path is what actually matters. The planner abandons an index somewhere around 'a few percent of rows', and almost nobody knows the number or that it exists. EXPLAIN QUERY PLAN makes the switch point directly observable, and ANALYZE/STAT4 changes it -- so the post can show the planner making a decision, not just a timing curve. The engine can now render generated charts (added for post 3), and this experiment is a sweep whose whole point is a curve with a switch point in it, so it is the natural next use of that. As of 2026-09-03 this is also the only ready idea whose headline survives a throttled machine: the answer is a planner decision and a crossover point, read from EXPLAIN QUERY PLAN, not a nanosecond constant. Prefer it whenever machine_speed.ratio is below 0.75.",
-      "design": "Fixed table, sweep the fraction of matching rows from 0.01% to 100%. Record the plan at each point alongside the timing, with and without ANALYZE. The crossover is the headline number.",
-      "confidence_it_is_interesting": "high"
+      "why_now": "Designed and run on 2026-09-07; the run is committed uncertified and the structural half of the answer is already in hand. **The premise this idea was filed under was wrong**, and the truth is better. It assumed the planner abandons an index 'around a few percent of rows' -- that is the Postgres/Oracle number, and SQLite does not behave that way. Measured from EXPLAIN QUERY PLAN, with no timing involved: with a bound parameter SQLite never abandons the index at any selectivity up to and including 100% of rows; with a literal and after ANALYZE it switches only at 100%; without ANALYZE, never. Meanwhile the timing sweep points at a real crossover near 2-4% for an index uncorrelated with rowid. If that holds, the gap between where the planner switches and where it should is very large, and the post writes itself.",
+      "design": "Fixed table, sweep the fraction of matching rows. Force each access path with INDEXED BY / NOT INDEXED to find the real crossover, and read the planner's own choice from EXPLAIN QUERY PLAN alongside. Three controls: row order (an index correlated with rowid may have no crossover at all), covering versus non-covering, and literal versus bound parameter -- the optimiser cannot use its histograms on a value it cannot see at prepare time, which is the case almost every ORM generates.",
+      "confidence_it_is_interesting": "high",
+      "title": "SQLite will use an index to read your whole table",
+      "headline_type": "structural (planner decision) plus a within-run crossover; no absolute constants required",
+      "blocked_on": "A trustworthy measurement environment. The structural findings need nothing and could be published today, but without the timing there is no way to say the planner's choice is *wrong*, which is the entire point. Needs machine_speed >= 0.75 and a run with no unstable or undersampled results. See the experiment's STATUS.md."
     },
     {
       "slug": "hashable-key-cost",
@@ -41,6 +45,16 @@
     }
   ],
   "considering": [
+    {
+      "slug": "orm-parameter-blindness",
+      "question": "Does using a bound parameter instead of a literal change the query plan you get?",
+      "contested_belief": "Parameterised queries are strictly better: same plan, no injection risk, and the statement cache makes them faster.",
+      "why_now": "Fell out of the index-selectivity run on 2026-09-07 and is arguably a bigger post than its parent. SQLite's planner switched to a table scan at 100% selectivity with a literal and never switched at all with a bound parameter -- the optimiser cannot consult its histograms for a value it cannot see at prepare time. Every ORM emits bound parameters for everything, so this is the plan almost all production code actually gets, and the advice to always parameterise is given without anyone mentioning it has a planner cost.",
+      "design": "Sweep selectivity and record the plan for literal and bound forms side by side, with and without ANALYZE and STAT4. Purely structural -- EXPLAIN QUERY PLAN, no timing -- so it is immune to the machine-speed problem entirely. Timing only to price the consequence.",
+      "risk": "Overlaps index-selectivity-crossover, which currently owns this as one of its three controls. Decide which one carries it rather than splitting it across both; if the parent post gets crowded, this is the half to spin out.",
+      "headline_type": "structural; needs no timing at all",
+      "confidence_it_is_interesting": "medium-high"
+    },
     {
       "slug": "rows-not-columns",
       "question": "What does a row cost to fetch, and how much of it is the driver rather than the database?",

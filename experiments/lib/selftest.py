@@ -14,7 +14,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bench import (bench, calibrate, reference_record, Result,  # noqa: E402
-                   NOISE_FLOOR_NS, REFERENCE_PATH, _loadavg)
+                   NOISE_FLOOR_NS, REFERENCE_PATH, _loadavg, _plan,
+                   MS_TRIAL_TARGET, MIN_MS_TRIALS, MS_BUDGET_S)
 
 failures: list[str] = []
 passed = 0
@@ -80,19 +81,34 @@ check("setup cost is excluded from per-op timing", slow_setup.ns_per_op < 200,
 
 # --- 8. The sampling plan must adapt to the cost of the operation -----------
 # A cheap operation needs many short windows so that at least one of them lands
-# between scheduler preemptions; an expensive one does not, and paying for 101
-# trials of it would make a suite take hours.
+# between scheduler preemptions.
+#
+# **Two checks here previously asserted the opposite for expensive operations**
+# ("an expensive operation is sampled few times", trials <= 31, and that trial
+# count falls monotonically with cost). They encoded the belief that a long
+# window is safe from preemption because interference is small relative to it.
+# On 2026-09-07 that belief was measured and is false: a 55ms scan's minimum
+# fell 37% between 15 and 400 trials. Those two checks were removed rather than
+# relaxed, because they were pinning a bug in place. What replaces them is the
+# property that is actually wanted -- a bounded *cost* per measurement, and no
+# silent drop below the trial count needed to find a floor.
 fast = bench("cheap op", "y = x + 1", setup="x = 41")            # nanoseconds
 mid = bench("mid op", "y = sorted(data)", setup="data = list(range(20000))[::-1]")   # ~0.2 ms
 slow = bench("expensive op", "y = sorted(data)", setup="data = list(range(400000))[::-1]")  # ~5 ms
 check("a cheap operation is sampled many times", fast.trials >= 101,
       f"got {fast.trials} trials for {fast.ns_per_op:.1f} ns/op")
-check("an expensive operation is sampled few times", slow.trials <= 31,
-      f"got {slow.trials} trials for {slow.ns_per_op / 1e6:.2f} ms/op")
-check("sampling falls monotonically as the operation gets more expensive",
-      fast.trials > mid.trials > slow.trials,
-      f"{fast.trials} ({fast.ns_per_op:.0f}ns) > {mid.trials} ({mid.ns_per_op / 1e6:.2f}ms)"
-      f" > {slow.trials} ({slow.ns_per_op / 1e6:.2f}ms)")
+check("an expensive operation is still sampled enough to find its floor",
+      slow.trials >= MIN_MS_TRIALS or slow.undersampled,
+      f"got {slow.trials} trials for {slow.ns_per_op / 1e6:.2f} ms/op, "
+      f"undersampled={slow.undersampled}")
+check("no measurement is allowed to exceed the sampling budget by much",
+      slow.trials * slow.ns_per_op / 1e9 <= MS_BUDGET_S * 1.5,
+      f"{slow.trials} trials x {slow.ns_per_op / 1e6:.2f} ms "
+      f"= {slow.trials * slow.ns_per_op / 1e9:.1f}s vs {MS_BUDGET_S}s budget")
+check("any measurement sampled below the floor is flagged, not published",
+      all(r.undersampled or r.trials >= MIN_MS_TRIALS or r.ns_per_op < 1e6
+          for r in (fast, mid, slow)),
+      f"fast={fast.trials} mid={mid.trials} slow={slow.trials}")
 
 # --- 8b. A trial window must actually last about as long as it was asked to -
 # If the iteration count were derived from a badly wrong cost estimate, every
@@ -158,6 +174,55 @@ check("a run at the record's speed is accepted", 1.0 >= floor)
 check("a slower observation cannot loosen the record",
       speed["observed_ns"] >= rec["best_ns"] or speed["speed_ratio"] >= 1.0,
       f"observed={speed['observed_ns']:.2f} record={rec['best_ns']:.2f}")
+
+# ---------------------------------------------------------------------------
+# The millisecond sampling plan.
+#
+# Added 2026-09-07, after measuring that a 55ms SQLite scan's minimum drifts
+# 37% between 15 and 400 trials, and that at 40 trials the split-half check
+# certifies a figure 45% above the settled floor. The old plan sampled
+# millisecond work 15 times. These checks pin the properties that fix relies on.
+# ---------------------------------------------------------------------------
+
+ms_trials, _ = _plan(2e6)                     # a 2ms operation: budget is ample
+check("a millisecond operation is sampled at the evidence-backed target",
+      ms_trials == MS_TRIAL_TARGET, f"trials={ms_trials}")
+
+cheap_trials, _ = _plan(50e6)                 # 50ms: 401 trials would be 20s
+check("a 50ms operation stays at or above the minimum trial count",
+      cheap_trials >= MIN_MS_TRIALS, f"trials={cheap_trials}")
+
+slow_trials, _ = _plan(2e9)                   # a 2s operation: budget bites hard
+check("an operation too slow to sample enough is cut by the budget",
+      slow_trials < MIN_MS_TRIALS, f"trials={slow_trials}")
+
+check("the budget is respected at the top of the millisecond range",
+      slow_trials * 2.0 <= MS_BUDGET_S + 2.0,
+      f"{slow_trials} trials x 2s vs {MS_BUDGET_S}s budget")
+
+# The flag must actually block publication, and must not be rescuable by a
+# flattering stability figure -- that is the whole point of it.
+check("an undersampled result is never trustworthy",
+      not Result(name="x", ns_per_op=5e7, median_ns=5e7, spread_pct=0.0,
+                 iterations=1, trials=20, stability_pct=0.0,
+                 undersampled=True).trustworthy)
+check("an otherwise identical well-sampled result is trustworthy",
+      Result(name="x", ns_per_op=5e7, median_ns=5e7, spread_pct=0.0,
+             iterations=1, trials=401, stability_pct=0.0,
+             undersampled=False).trustworthy)
+check("an undersampled result says so when printed",
+      "UNDERSAMPLED" in str(Result(name="x", ns_per_op=5e7, median_ns=5e7,
+                                   spread_pct=0.0, iterations=1, trials=20,
+                                   stability_pct=0.0, undersampled=True)))
+
+# Sub-millisecond work must be untouched by any of this: the nanosecond and
+# microsecond tiers were validated by earlier runs and are not being changed.
+check("sub-microsecond work still gets many short windows",
+      _plan(30.0) == (401, 0.006), f"{_plan(30.0)}")
+check("microsecond work is unchanged", _plan(50_000.0) == (151, 0.020),
+      f"{_plan(50_000.0)}")
+check("a fast operation is never marked undersampled",
+      not bench("cheap", "1 + 1").undersampled)
 
 print(f"\nmachine speed during this run: {speed['speed_ratio']:.2f}x of the "
       f"{rec['best_ns']:.2f} ns record ({speed['observed_ns']:.2f} ns observed)")
